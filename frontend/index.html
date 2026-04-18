@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Polarization Analyzer | with Visualizations</title>
+    <!-- Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        /* Header */
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            margin-bottom: 10px;
+        }
+        
+        @supports not (background-clip: text) {
+            .header h1 {
+                background: none;
+                color: #667eea;
+            }
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1.1rem;
+        }
+        
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #f0f0f0;
+            padding-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .card h2 i {
+            color: #667eea;
+        }
+        
+        /* Selection Section */
+        .selection-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            align-items: end;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .form-group label {
+            font-weight: 600;
+            color: #555;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .form-control {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 14px 30px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        /* Loading with Timer */
+        .loading-container {
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .loading-spinner {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid #e0e0e0;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .processing-timer {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .processing-steps {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .step.active {
+            color: #667eea;
+            font-weight: bold;
+        }
+        
+        .step.completed {
+            color: #10b981;
+        }
+        
+        /* Platform Badge */
+        .platform-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border-radius: 50px;
+            margin-bottom: 20px;
+        }
+        
+        .platform-badge.daraz {
+            border-left: 4px solid #ff6b00;
+        }
+        
+        .platform-badge.etsy {
+            border-left: 4px solid #f16521;
+        }
+        
+        /* TOP 10 PRODUCTS SECTION */
+        .top-products-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .ranking-info {
+            background: #f0f4ff;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: #555;
+        }
+        
+        .ranking-info strong {
+            color: #667eea;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .product-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 900px;
+        }
+        
+        .product-table th {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #495057;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .product-table td {
+            padding: 15px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .product-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .rank-badge {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        
+        .score-highlight {
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        /* POLARIZATION SCORE SECTION */
+        .polarization-container {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+        }
+        
+        .polarization-label {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+        
+        .polarization-value {
+            font-size: 4rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .polarization-level {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+        }
+        
+        .meter-container {
+            max-width: 500px;
+            margin: 20px auto;
+        }
+        
+        .meter {
+            width: 100%;
+            height: 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .meter-fill {
+            height: 100%;
+            background: white;
+            border-radius: 10px;
+            transition: width 1s ease;
+        }
+        
+        .meter-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+        
+        /* VISUALIZATIONS SECTION */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .chart-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .chart-card h3 {
+            margin-bottom: 15px;
+            color: #495057;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        
+        /* CLUSTERS SECTION */
+        .clusters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .cluster-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 4px solid;
+            transition: transform 0.2s;
+        }
+        
+        .cluster-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .cluster-card.budget {
+            border-left-color: #48bb78;
+        }
+        
+        .cluster-card.mid-range {
+            border-left-color: #ecc94b;
+        }
+        
+        .cluster-card.premium {
+            border-left-color: #9f7aea;
+        }
+        
+        .cluster-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .cluster-name {
+            font-size: 1.2rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .cluster-size {
+            background: #e9ecef;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        .cluster-detail {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px dashed #e0e0e0;
+        }
+        
+        .cluster-detail:last-child {
+            border-bottom: none;
+        }
+        
+        /* FEATURE IMPORTANCE */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .feature-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+        }
+        
+        .feature-name {
+            color: #666;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .feature-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        /* DATA SOURCE BADGE */
+        .data-source-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .data-source-csv {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        /* Responsive */
+        @media (max-width: 992px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .polarization-value {
+                font-size: 3rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📊 Product Polarization Analyzer</h1>
+            <p class="subtitle">Visual Analysis with K-Means Clustering | Real CSV Data Only</p>
+        </div>
+
+        <!-- STEP 1: Selection Section -->
+        <div class="card">
+            <h2><i>🔍</i> Step 1: Select Platform & Category</h2>
+            <div class="selection-controls">
+                <div class="form-group">
+                    <label><span>📱</span> Platform:</label>
+                    <select id="platformSelect" class="form-control">
+                        <option value="">-- Select Platform --</option>
+                        <option value="daraz">Daraz.pk (Pakistan)</option>
+                        <option value="etsy">Etsy.com (USA)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label><span>📂</span> Category:</label>
+                    <select id="categorySelect" class="form-control" disabled>
+                        <option value="">-- Select Platform First --</option>
+                    </select>
+                </div>
+                
+                <button id="analyzeBtn" class="btn-primary" disabled>
+                    <span>🚀</span> Analyze Polarization
+                </button>
+            </div>
+            
+            <!-- Loading with 3 second timer -->
+            <div class="loading-container" id="loadingContainer">
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                    <div>
+                        <div class="processing-timer" id="timer">Processing... 3s</div>
+                        <div class="processing-steps" id="processingSteps">
+                            <span class="step" id="step1">📊 Loading CSV Data</span>
+                            <span class="step" id="step2">🧹 Cleaning & Normalizing</span>
+                            <span class="step" id="step3">🤖 Applying K-Means</span>
+                            <span class="step" id="step4">📈 Calculating Score</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Platform Info -->
+        <div class="platform-badge" id="platformBadge" style="display: none;"></div>
+
+        <!-- SECTION 1: TOP 10 PRODUCTS -->
+        <div class="card" id="topProductsSection" style="display: none;">
+            <h2><i>🏆</i> Top 10 Products (Ranked by Score)</h2>
+            
+            <div class="top-products-header">
+                <div class="ranking-info">
+                    <strong>Ranking Formula:</strong> Score = (Rating × 0.35) + (Reviews × 0.30) + (Popularity × 0.20) + (Price Factor × 0.15)
+                </div>
+                <div id="dataSourceBadge"></div>
+            </div>
+            
+            <div class="table-container">
+                <table class="product-table" id="productsTable">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Product Name</th>
+                            <th>Price</th>
+                            <th>Rating ⭐</th>
+                            <th>Reviews 📝</th>
+                            <th>Popularity 🔥</th>
+                            <th>Final Score</th>
+                            <th>Cluster</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productsBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- SECTION 2: POLARIZATION SCORE -->
+        <div class="card" id="polarizationSection" style="display: none;">
+            <h2><i>📈</i> Polarization Score</h2>
+            
+            <div class="polarization-container">
+                <div class="polarization-label">Category Polarization Level</div>
+                <div class="polarization-value" id="polarizationScore">0.000</div>
+                <div class="polarization-level" id="polarizationLevel">Analyzing...</div>
+                
+                <div class="meter-container">
+                    <div class="meter">
+                        <div class="meter-fill" id="scoreMeter" style="width: 0%"></div>
+                    </div>
+                    <div class="meter-labels">
+                        <span>Low</span>
+                        <span>Medium</span>
+                        <span>High</span>
+                        <span>Very High</span>
+                    </div>
+                </div>
+
+                <!-- Inside the polarization-container div -->
+<div style="margin-top: 20px; padding: 12px; background: rgba(255,255,255,0.15); border-radius: 10px;">
+    <div style="font-size: 0.95rem; opacity: 0.9;">Cluster Quality (Silhouette Score)</div>
+    <div id="silhouetteScore" style="font-size: 1.8rem; font-weight: bold; margin: 8px 0;">0.000</div>
+    <div id="silhouetteLabel" style="font-size: 0.85rem; opacity: 0.85;">Fair clustering</div>
+</div>
+                
+                <p style="margin-top: 20px; font-size: 0.95rem; opacity: 0.9;">
+                    <strong>Interpretation:</strong> Higher score means products are more divided into distinct groups
+                </p>
+            </div>
+        </div>
+
+        <!-- SECTION 3: VISUALIZATIONS (Cluster Graph + Bar Chart) -->
+        <div class="card" id="visualizationsSection" style="display: none;">
+            <h2><i>📊</i> Visual Insights</h2>
+            
+            <div class="charts-grid">
+                <!-- Scatter Plot - Cluster Graph -->
+                <div class="chart-card">
+                    <h3><span>🔵</span> Cluster Distribution (Scatter Plot)</h3>
+                    <div class="chart-container">
+                        <canvas id="scatterChart"></canvas>
+                    </div>
+                    <p style="margin-top: 10px; font-size: 0.85rem; color: #666;">
+                        Each point represents a product. Colors show Budget (green), Mid-Range (yellow), Premium (purple)
+                    </p>
+                </div>
+                
+                <!-- Bar Chart - Feature Comparison -->
+                <div class="chart-card">
+                    <h3><span>📊</span> Cluster Comparison</h3>
+                    <div class="chart-container">
+                        <canvas id="barChart"></canvas>
+                    </div>
+                    <p style="margin-top: 10px; font-size: 0.85rem; color: #666;">
+                        Average price and rating by cluster
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 4: PRODUCT CLUSTERS -->
+        <div class="card" id="clustersSection" style="display: none;">
+            <h2><i>📦</i> Product Clusters (K-Means with K=3)</h2>
+            <div class="clusters-grid" id="clustersGrid"></div>
+        </div>
+
+        <!-- SECTION 5: FEATURE IMPORTANCE -->
+        <div class="card" id="featuresSection" style="display: none;">
+            <h2><i>⚖️</i> Feature Importance</h2>
+            <div class="features-grid" id="featuresGrid"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+        
+        // Available categories from datasets
+        const AVAILABLE_CATEGORIES = {
+            daraz: ['Earpods', 'Power banks'],
+            etsy: ['Earpods', 'Headphones']
+        };
+        
+        // DOM Elements
+        const elements = {
+            platformSelect: document.getElementById('platformSelect'),
+            categorySelect: document.getElementById('categorySelect'),
+            analyzeBtn: document.getElementById('analyzeBtn'),
+            loadingContainer: document.getElementById('loadingContainer'),
+            platformBadge: document.getElementById('platformBadge'),
+            topProductsSection: document.getElementById('topProductsSection'),
+            productsBody: document.getElementById('productsBody'),
+            polarizationSection: document.getElementById('polarizationSection'),
+            polarizationScore: document.getElementById('polarizationScore'),
+            polarizationLevel: document.getElementById('polarizationLevel'),
+            scoreMeter: document.getElementById('scoreMeter'),
+            visualizationsSection: document.getElementById('visualizationsSection'),
+            clustersSection: document.getElementById('clustersSection'),
+            clustersGrid: document.getElementById('clustersGrid'),
+            featuresSection: document.getElementById('featuresSection'),
+            featuresGrid: document.getElementById('featuresGrid'),
+            dataSourceBadge: document.getElementById('dataSourceBadge'),
+            timer: document.getElementById('timer'),
+            step1: document.getElementById('step1'),
+            step2: document.getElementById('step2'),
+            step3: document.getElementById('step3'),
+            step4: document.getElementById('step4')
+        };
+
+        // Chart instances
+        let scatterChart = null;
+        let barChart = null;
+
+        // State
+        let currentState = {
+            platform: '',
+            category: ''
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 App initialized');
+            checkBackend();
+            setupEventListeners();
+        });
+
+        // Check backend connection
+        async function checkBackend() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/`);
+                const data = await response.json();
+                console.log('✅ Backend connected:', data);
+            } catch (error) {
+                console.error('❌ Backend connection failed:', error);
+                alert('⚠️ Cannot connect to backend. Please ensure server is running on port 8000');
+            }
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            elements.platformSelect.addEventListener('change', handlePlatformChange);
+            elements.categorySelect.addEventListener('change', handleCategoryChange);
+            elements.analyzeBtn.addEventListener('click', runAnalysis);
+        }
+
+        // Handle platform selection
+        function handlePlatformChange(e) {
+            currentState.platform = e.target.value;
+            
+            if (currentState.platform) {
+                elements.categorySelect.disabled = false;
+                populateCategories();
+            } else {
+                elements.categorySelect.disabled = true;
+                elements.categorySelect.innerHTML = '<option value="">-- Select Platform First --</option>';
+                currentState.category = '';
+                updateAnalyzeButton();
+            }
+        }
+
+        // Populate categories
+        function populateCategories() {
+            const categories = AVAILABLE_CATEGORIES[currentState.platform] || [];
+            elements.categorySelect.innerHTML = '<option value="">-- Select Category --</option>';
+            categories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.toLowerCase();
+                option.textContent = cat;
+                elements.categorySelect.appendChild(option);
+            });
+        }
+
+        // Handle category change
+        function handleCategoryChange(e) {
+            currentState.category = e.target.value;
+            updateAnalyzeButton();
+        }
+
+        // Update analyze button state
+        function updateAnalyzeButton() {
+            elements.analyzeBtn.disabled = !(currentState.platform && currentState.category);
+        }
+
+        // Show/hide loading with timer
+        function setLoading(show) {
+            elements.loadingContainer.style.display = show ? 'block' : 'none';
+            elements.analyzeBtn.disabled = show;
+        }
+
+        // Update processing steps
+        function updateStep(stepNumber, status) {
+            const steps = [elements.step1, elements.step2, elements.step3, elements.step4];
+            steps.forEach((step, index) => {
+                step.classList.remove('active', 'completed');
+                if (index + 1 < stepNumber) {
+                    step.classList.add('completed');
+                } else if (index + 1 === stepNumber) {
+                    step.classList.add('active');
+                }
+            });
+        }
+
+        // Simulate 3 second processing with steps
+        async function simulateProcessing() {
+            return new Promise((resolve) => {
+                let seconds = 3;
+                let step = 1;
+                
+                // Update timer every second
+                const timerInterval = setInterval(() => {
+                    seconds--;
+                    elements.timer.textContent = `Processing... ${seconds}s`;
+                    
+                    // Update steps based on time
+                    if (seconds === 2) {
+                        step = 2;
+                        updateStep(2, 'active');
+                    } else if (seconds === 1) {
+                        step = 3;
+                        updateStep(3, 'active');
+                    }
+                }, 1000);
+                
+                // After 3 seconds, complete
+                setTimeout(() => {
+                    clearInterval(timerInterval);
+                    updateStep(4, 'active');
+                    setTimeout(() => {
+                        updateStep(4, 'completed');
+                        resolve();
+                    }, 500);
+                }, 3000);
+            });
+        }
+
+        // Hide all results
+        function hideResults() {
+            elements.topProductsSection.style.display = 'none';
+            elements.polarizationSection.style.display = 'none';
+            elements.visualizationsSection.style.display = 'none';
+            elements.clustersSection.style.display = 'none';
+            elements.featuresSection.style.display = 'none';
+            elements.platformBadge.style.display = 'none';
+        }
+
+        // Destroy existing charts
+        function destroyCharts() {
+            if (scatterChart) {
+                scatterChart.destroy();
+                scatterChart = null;
+            }
+            if (barChart) {
+                barChart.destroy();
+                barChart = null;
+            }
+        }
+
+        // Create scatter plot
+        function createScatterChart(products, clusters) {
+            const ctx = document.getElementById('scatterChart').getContext('2d');
+            
+            // Prepare data for scatter plot (Price vs Rating)
+            const budgetData = products.filter(p => p.cluster_label === 'Budget').map(p => ({
+                x: p.price,
+                y: p.rating
+            }));
+            
+            const midData = products.filter(p => p.cluster_label === 'Mid-Range').map(p => ({
+                x: p.price,
+                y: p.rating
+            }));
+            
+            const premiumData = products.filter(p => p.cluster_label === 'Premium').map(p => ({
+                x: p.price,
+                y: p.rating
+            }));
+            
+            scatterChart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Budget',
+                            data: budgetData,
+                            backgroundColor: '#48bb78',
+                            pointRadius: 6,
+                            pointHoverRadius: 8
+                        },
+                        {
+                            label: 'Mid-Range',
+                            data: midData,
+                            backgroundColor: '#ecc94b',
+                            pointRadius: 6,
+                            pointHoverRadius: 8
+                        },
+                        {
+                            label: 'Premium',
+                            data: premiumData,
+                            backgroundColor: '#9f7aea',
+                            pointRadius: 6,
+                            pointHoverRadius: 8
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Product Distribution: Price vs Rating'
+                        },
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: currentState.platform === 'daraz' ? 'Price (PKR)' : 'Price (USD)'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Rating (0-5)'
+                            },
+                            min: 0,
+                            max: 5
+                        }
+                    }
+                }
+            });
+        }
+
+        // Create bar chart
+        function createBarChart(clusters) {
+            const ctx = document.getElementById('barChart').getContext('2d');
+            
+            const labels = clusters.map(c => c.label);
+            const prices = clusters.map(c => c.avg_price);
+            const ratings = clusters.map(c => c.avg_rating);
+            
+            barChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Average Price',
+                            data: prices,
+                            backgroundColor: '#667eea',
+                            yAxisID: 'y-price',
+                            borderColor: '#5a67d8',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Average Rating',
+                            data: ratings,
+                            backgroundColor: '#fbbf24',
+                            yAxisID: 'y-rating',
+                            borderColor: '#f59e0b',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Cluster Comparison: Price vs Rating'
+                        },
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        'y-price': {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: currentState.platform === 'daraz' ? 'Price (PKR)' : 'Price (USD)'
+                            }
+                        },
+                        'y-rating': {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Rating (0-5)'
+                            },
+                            min: 0,
+                            max: 5,
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Run analysis
+        async function runAnalysis() {
+            if (!currentState.platform || !currentState.category) {
+                alert('Please select both platform and category');
+                return;
+            }
+            
+            try {
+                // Reset UI
+                setLoading(true);
+                hideResults();
+                destroyCharts();
+                
+                // Reset steps
+                updateStep(1, 'active');
+                elements.timer.textContent = 'Processing... 3s';
+                
+                // Simulate 3 second processing
+                await simulateProcessing();
+                
+                console.log(`📡 Analyzing ${currentState.platform} - ${currentState.category}`);
+                
+                const response = await fetch(`${API_BASE_URL}/api/analyze`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        platform: currentState.platform,
+                         category: currentState.category, 
+                        subcategory: currentState.category,
+                        max_products: 50
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.text();
+                    throw new Error(error);
+                }
+                
+                const data = await response.json();
+                console.log('📊 Analysis result:', data);
+                
+                // Display all results
+                displayResults(data);
+                
+            } catch (error) {
+                console.error('❌ Analysis failed:', error);
+                alert(`❌ Error: ${error.message}\n\nPlease ensure CSV files exist and have valid data.`);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // Display all results
+        function displayResults(data) {
+            // Platform badge
+            elements.platformBadge.innerHTML = `
+                <span>${currentState.platform === 'daraz' ? '📦' : '🛍️'}</span>
+                <span><strong>${data.platform}</strong> | Category: ${currentState.category} | Products: ${data.total_products}</span>
+            `;
+            elements.platformBadge.className = `platform-badge ${currentState.platform}`;
+            elements.platformBadge.style.display = 'flex';
+            
+            // Data source badge
+            elements.dataSourceBadge.innerHTML = `
+                <span class="data-source-badge data-source-csv">
+                    ✅ ${data.data_source}
+                </span>
+            `;
+            
+            // Top 10 Products
+            displayTopProducts(data.products.slice(0, 10));
+            
+            // Polarization Score
+            elements.polarizationScore.textContent = data.polarization_score.toFixed(3);
+            elements.polarizationLevel.textContent = data.polarization_level;
+            elements.scoreMeter.style.width = `${data.polarization_score * 100}%`;
+            elements.polarizationSection.style.display = 'block';
+
+            // Silhouette Score
+if (data.silhouette_score !== undefined) {
+    const sil = data.silhouette_score;
+    document.getElementById('silhouetteScore').textContent = sil.toFixed(4);
+    
+    let label = "Fair clustering";
+    let color = "#f59e0b";
+    if (sil >= 0.7) { label = "Excellent clustering"; color = "#10b981"; }
+    else if (sil >= 0.5) { label = "Good clustering"; color = "#eab308"; }
+    
+    document.getElementById('silhouetteLabel').textContent = label;
+    document.getElementById('silhouetteLabel').style.color = color;
+}
+            
+            // Visualizations
+            createScatterChart(data.products, data.clusters);
+            createBarChart(data.clusters);
+            elements.visualizationsSection.style.display = 'block';
+            
+            // Clusters
+            displayClusters(data.clusters);
+            
+            // Feature Importance
+            displayFeatures(data.feature_importance);
+        }
+
+        // Display Top 10 Products
+        function displayTopProducts(products) {
+            let html = '';
+            products.forEach((product, index) => {
+                const finalScore = (
+                    (product.rating / 5) * 0.35 +
+                    (Math.min(product.reviews, 1000) / 1000) * 0.30 +
+                    product.popularity_score * 0.20 +
+                    (1 - Math.min(product.price, currentState.platform === 'daraz' ? 5000 : 200) / 
+                          (currentState.platform === 'daraz' ? 5000 : 200)) * 0.15
+                ).toFixed(3);
+                
+                let badgeClass = 'badge-budget';
+                if (product.cluster_label === 'Premium') badgeClass = 'badge-premium';
+                else if (product.cluster_label === 'Mid-Range') badgeClass = 'badge-mid';
+                
+                html += `
+                    <tr>
+                        <td><span class="rank-badge">${index + 1}</span></td>
+                        <td>${product.name.substring(0, 60)}${product.name.length > 60 ? '...' : ''}</td>
+                        <td><strong>${formatPrice(product.price)}</strong></td>
+                        <td>${product.rating.toFixed(1)} ⭐</td>
+                        <td>${product.reviews.toLocaleString()}</td>
+                        <td>${(product.popularity_score * 100).toFixed(0)}%</td>
+                        <td><span class="score-highlight">${finalScore}</span></td>
+                        <td><span class="cluster-badge ${badgeClass}">${product.cluster_label}</span></td>
+                    </tr>
+                `;
+            });
+            
+            elements.productsBody.innerHTML = html;
+            elements.topProductsSection.style.display = 'block';
+        }
+
+        // Display Clusters
+        function displayClusters(clusters) {
+            let html = '';
+            clusters.forEach(cluster => {
+                let clusterClass = 'budget';
+                if (cluster.label === 'Premium') clusterClass = 'premium';
+                else if (cluster.label === 'Mid-Range') clusterClass = 'mid-range';
+                
+                html += `
+                    <div class="cluster-card ${clusterClass}">
+                        <div class="cluster-header">
+                            <span class="cluster-name">
+                                ${clusterClass === 'budget' ? '💰' : (clusterClass === 'premium' ? '💎' : '⚖️')}
+                                ${cluster.label}
+                            </span>
+                            <span class="cluster-size">${cluster.size} products</span>
+                        </div>
+                        <div class="cluster-details">
+                            <div class="cluster-detail">
+                                <span>Average Price:</span>
+                                <span><strong>${formatPrice(cluster.avg_price)}</strong></span>
+                            </div>
+                            <div class="cluster-detail">
+                                <span>Average Rating:</span>
+                                <span><strong>${cluster.avg_rating.toFixed(2)} ⭐</strong></span>
+                            </div>
+                            <div class="cluster-detail">
+                                <span>Market Share:</span>
+                                <span><strong>${cluster.percentage}%</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            elements.clustersGrid.innerHTML = html;
+            elements.clustersSection.style.display = 'block';
+        }
+
+        // Display Feature Importance
+        function displayFeatures(features) {
+            elements.featuresGrid.innerHTML = `
+                <div class="feature-card">
+                    <div class="feature-name">💰 Price</div>
+                    <div class="feature-value">${features.price}%</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-name">⭐ Rating</div>
+                    <div class="feature-value">${features.rating}%</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-name">📝 Reviews</div>
+                    <div class="feature-value">${features.reviews}%</div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-name">🔥 Popularity</div>
+                    <div class="feature-value">${features.popularity}%</div>
+                </div>
+            `;
+            elements.featuresSection.style.display = 'block';
+        }
+
+        // Format price
+        function formatPrice(price) {
+            if (currentState.platform === 'daraz') {
+                return `Rs ${Math.round(price).toLocaleString()}`;
+            } else {
+                return `$${price.toFixed(2)}`;
+            }
+        }
+    </script>
+</body>
+</html>

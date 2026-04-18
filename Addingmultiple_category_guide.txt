@@ -1,0 +1,160 @@
+Good — now you’re at the **scaling stage**, which is exactly what examiners look for in FYPs.
+
+Below is a **precise change map** so you can confidently add new categories.
+
+---
+
+# 📊 WHERE TO MODIFY FOR NEW CATEGORIES
+
+| Step | File/Section                      | What to Change                                  | Example                                 |
+| ---- | --------------------------------- | ----------------------------------------------- | --------------------------------------- |
+| 1    | `load_csv_data()` → `daraz_files` | Add new category + CSV paths                    | `"headphones": ["headphones.csv", ...]` |
+| 2    | CSV File                          | Add actual CSV in `/backend` or `/backend/data` | `headphones.csv`                        |
+| 3    | Frontend dropdown                 | Add category option                             | `"Headphones"`                          |
+| 4    | (Optional) Mapping                | Handle spacing issues                           | `"head phones" → "headphones"`          |
+| 5    | Nothing else                      | Extraction & analysis auto-work                 | No change needed                        |
+
+---
+
+# 🔧 1. ADD CATEGORY IN BACKEND
+
+### 📍 Location: `load_csv_data()`
+
+### ✅ Modify this:
+
+```python
+daraz_files = {
+    "earpods": [...],
+    "powerbanks": [...],
+
+    # ➕ ADD NEW CATEGORY HERE
+    "headphones": [
+        os.path.join(base_dir, "headphones.csv"),
+        os.path.join(base_dir, "data", "headphones.csv"),
+        "headphones.csv"
+    ]
+}
+```
+
+---
+
+# 📁 2. ADD CSV FILE
+
+Place file in:
+
+```
+backend/
+    headphones.csv
+```
+
+OR
+
+```
+backend/data/
+    headphones.csv
+```
+
+---
+
+# 🧠 3. CSV FORMAT MUST MATCH
+
+Your CSV should have columns like:
+
+```text
+name, price, ratingScore, itemSold, brandName, sellerName
+```
+
+👉 Otherwise your extractor will skip data
+
+---
+
+# 🌐 4. FRONTEND CHANGE (IMPORTANT)
+
+### 📍 In your dropdown (likely `index.html` or `scripts.js`)
+
+Add:
+
+```html
+<option value="headphones">Headphones</option>
+```
+
+---
+
+# ⚠️ 5. HANDLE SPACE ISSUES (YOU ALREADY FIXED)
+
+If frontend sends:
+
+```text
+"head phones"
+```
+
+Backend should normalize:
+
+```python
+subcategory = request.subcategory.lower().replace(" ", "")
+```
+
+---
+
+# 🧩 OPTIONAL (BEST PRACTICE – CLEAN MAPPING)
+
+Instead of `.replace()`, use:
+
+```python
+SUBCATEGORY_MAP = {
+    "ear pods": "earpods",
+    "power banks": "powerbanks",
+    "head phones": "headphones"
+}
+```
+
+---
+
+# 🔁 NO NEED TO CHANGE THESE
+
+| Component                  | Reason                  |
+| -------------------------- | ----------------------- |
+| `extract_daraz_products()` | Already dynamic         |
+| Clustering                 | Works for any data      |
+| Polarization score         | Independent of category |
+| API endpoint               | Already generic         |
+
+---
+
+# ⚡ MINIMUM STEPS SUMMARY
+
+If you want **quick add**, just do:
+
+1. Add in `daraz_files`
+2. Put CSV file
+3. Add dropdown option
+
+👉 That’s it — system auto-handles everything else
+
+---
+
+# 🧪 QUICK TEST CHECKLIST
+
+After adding new category:
+
+* [ ] Server restart
+* [ ] Check terminal:
+
+  ```
+  ✅ Loaded X headphones products
+  ```
+* [ ] Select category in frontend
+* [ ] Run analysis
+
+---
+
+# 🎯 FINAL TIP (FOR FYP PRESENTATION)
+
+You can say:
+
+> “The system is designed to be scalable — new product categories can be integrated by simply adding corresponding CSV files and updating configuration, without modifying core analytical logic.”
+
+---
+
+If you want next:
+I can help you add **multi-platform same category comparison (Daraz vs Etsy for same product)** — that’s a strong FYP upgrade.

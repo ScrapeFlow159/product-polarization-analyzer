@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FYP Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>FYP Polarization Tool - Test Page</h1>
+    <div id="status">Testing connection...</div>
+    
+    <script>
+        // Test backend connection
+        fetch('http://localhost:8000/api/categories')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('status').innerHTML = 
+                    '<h2 class="success">✅ Backend Connected!</h2>' +
+                    '<p>Categories loaded: ' + data.categories.length + '</p>' +
+                    '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            })
+            .catch(error => {
+                document.getElementById('status').innerHTML = 
+                    '<h2 class="error">❌ Connection Failed</h2>' +
+                    '<p>Error: ' + error.message + '</p>';
+            });
+    </script>
+</body>
+</html>
