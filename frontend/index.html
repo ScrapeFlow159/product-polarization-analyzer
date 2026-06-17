@@ -974,7 +974,7 @@
         Logged in as: <strong id="username">Guest</strong>
         <span class="badge" id="userRole" style="margin-left: 10px;">Role</span>
     </div>
-    <a href="http://localhost:5000/logout" class="btn btn-sm btn-danger">
+    <a href="/auth/logout" class="btn btn-sm btn-danger">
         <i class="fas fa-sign-out-alt"></i> Logout
     </a>
 </div>
@@ -1281,7 +1281,7 @@ function closeModal() {
     </div>
 
     <script>
-        const API_BASE_URL = 'http://localhost:8000';
+        const API_BASE_URL = window.location.origin;
         
         const AVAILABLE_CATEGORIES = {
             daraz: ['Earpods', 'Powerbanks', 'Mobile phone accessories', 'Gaming accessories', 'Smart watches'],

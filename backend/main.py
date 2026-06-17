@@ -5,6 +5,7 @@ from typing import List, Dict, Optional
 import pandas as pd
 import json  # ← YEH LINE ADD KARO (pehle se nahi hai)
 import numpy as np
+from fastapi.middleware.wsgi import WSGIMiddleware
 from sklearn.metrics import silhouette_score
 from sklearn.cluster import KMeans
 import sqlite3
@@ -13,6 +14,7 @@ import traceback
 import os
 from datetime import datetime, timedelta
 import re
+from flask_app import app as flask_app
 from database import (
     save_analysis_result, get_current_analysis, get_weekly_analysis,
     get_monthly_analysis, get_polarization_comparison, save_time_snapshot,
@@ -36,6 +38,26 @@ app = FastAPI(title="Product Polarization API - Time-Based Analysis",
 import csv
 from io import StringIO
 from fastapi.responses import StreamingResponse
+
+
+# ✅ Mount Flask app inside FastAPI
+app.mount("/auth", WSGIMiddleware(flask_app))
+
+# Serve static files (frontend)
+frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+print(f"📁 Frontend path: {frontend_path}")
+if os.path.exists(frontend_path):
+    app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+
+# Serve index.html at root
+@app.get("/")
+@app.get("/index.html")
+async def serve_index():
+    index_path = os.path.join(frontend_path, "index.html")
+    if os.path.exists(index_path):
+        with open(index_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>Frontend not found</h1>", status_code=404)
 
 @app.get("/api/export-results")
 async def export_results(
@@ -165,18 +187,6 @@ async def export_results(
         print(f"❌ Export error: {str(e)}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
-#Serve frontend HTML file
-frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
-
-@app.get("/", response_class=HTMLResponse)
-@app.get("/index.html", response_class=HTMLResponse)
-async def serve_frontend():
-    index_path = os.path.join(frontend_path, "index.html")
-    if os.path.exists(index_path):
-        with open(index_path, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
-    return HTMLResponse(content="<h1>Frontend not found. Please check folder structure.</h1>", status_code=404)
-
 
 
 
@@ -865,20 +875,7 @@ async def calculate_from_csv(platform, category):
         "dates": [datetime.now().strftime('%Y-%m-%d')],
         "note": "Using current data (no historical data available)"
     }
-# API Endpoints
-@app.get("/")
-def read_root():
-    return {
-        "message": "Product Polarization API - Time-Based Analysis",
-        "version": "5.0.0",
-        "features": {
-            "current_analysis": "Get current polarization score",
-            "weekly_analysis": "Get weekly polarization trends",
-            "monthly_analysis": "Get monthly polarization trends",
-            "comparison": "Compare current vs weekly vs monthly",
-            "historical_data": "Get complete historical data"
-        }
-    }
+
 
 @app.post("/api/analyze")
 async def analyze_polarization(
