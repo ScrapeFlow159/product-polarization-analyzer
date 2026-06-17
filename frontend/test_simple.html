@@ -1,32 +1,37 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>FYP Test</title>
-    <style>
-        body { font-family: Arial; padding: 20px; }
-        .success { color: green; }
-        .error { color: red; }
-    </style>
+    <title>Test Custom Week</title>
 </head>
 <body>
-    <h1>FYP Polarization Tool - Test Page</h1>
-    <div id="status">Testing connection...</div>
-    
+    <h2>Test Custom Week Analysis</h2>
+    <button onclick="test()">Click to Test</button>
+    <pre id="result"></pre>
+
     <script>
-        // Test backend connection
-        fetch('http://localhost:8000/api/categories')
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('status').innerHTML = 
-                    '<h2 class="success">✅ Backend Connected!</h2>' +
-                    '<p>Categories loaded: ' + data.categories.length + '</p>' +
-                    '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
-            })
-            .catch(error => {
-                document.getElementById('status').innerHTML = 
-                    '<h2 class="error">❌ Connection Failed</h2>' +
-                    '<p>Error: ' + error.message + '</p>';
-            });
+        async function test() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Loading...';
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/analyze-custom', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        platform: 'daraz',
+                        category: 'earpods',
+                        unit: 'days',
+                        duration: 3,
+                        max_products: 50
+                    })
+                });
+                
+                const data = await response.json();
+                resultDiv.innerHTML = JSON.stringify(data, null, 2);
+            } catch (error) {
+                resultDiv.innerHTML = 'Error: ' + error.message;
+            }
+        }
     </script>
 </body>
 </html>

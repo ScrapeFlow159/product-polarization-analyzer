@@ -1,31 +1,196 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import pandas as pd
+import json  # ← YEH LINE ADD KARO (pehle se nahi hai)
 import numpy as np
 from sklearn.metrics import silhouette_score
 from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
+import sqlite3
+from database import DB_PATH  # <-- YEH LINE ADD KARO
 import traceback
 import os
-from datetime import datetime
-import math
+from datetime import datetime, timedelta
 import re
+from database import (
+    save_analysis_result, get_current_analysis, get_weekly_analysis,
+    get_monthly_analysis, get_polarization_comparison, save_time_snapshot,
+    get_trend_data, get_all_historical_data,
+    save_daily_snapshot, get_daily_snapshots, get_weekly_snapshots  # <-- YEH ADD KARO
+)
+from scheduler import start_scheduler
+from fastapi import HTTPException, Request
+from fastapi.responses import RedirectResponse
+import sqlite3
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
+import os
+from pydantic import BaseModel
 
-app = FastAPI(title="Product Polarization API - CSV Only",
-              description="Analyze product polarization using REAL CSV data only",
-              version="3.0.0")
 
+app = FastAPI(title="Product Polarization API - Time-Based Analysis",
+              description="Analyze product polarization with weekly/monthly trends",
+              version="5.0.0")
+
+import csv
+from io import StringIO
+from fastapi.responses import StreamingResponse
+
+@app.get("/api/export-results")
+async def export_results(
+    platform: str, 
+    category: str, 
+    analysis_type: str = "current",
+    username: str = None,
+    role: str = None
+):
+    """Export analysis results as CSV"""
+    try:
+        print(f"📊 Export requested: platform={platform}, category={category}, type={analysis_type}")
+        
+        # Check authorization
+        if role not in ["Research Analyst", "Admin"]:
+            raise HTTPException(status_code=403, detail="Only Research Analyst and Admin can export data")
+        
+        import sqlite3
+        from database import DB_PATH
+        import json
+        
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Try to get data - first check polarization_analysis
+        cursor.execute('''
+            SELECT * FROM polarization_analysis 
+            WHERE platform LIKE ? AND category = ? 
+            ORDER BY analysis_date DESC LIMIT 1
+        ''', (f'%{platform}%', category))
+        
+        row = cursor.fetchone()
+        
+        if not row:
+            # Try without platform filter
+            cursor.execute('''
+                SELECT * FROM polarization_analysis 
+                WHERE category = ? 
+                ORDER BY analysis_date DESC LIMIT 1
+            ''', (category,))
+            row = cursor.fetchone()
+        
+        conn.close()
+        
+        if not row:
+            raise HTTPException(status_code=404, detail=f"No data found for {category}. Please run Current Analysis first.")
+        
+        # Parse the data (adjust indices based on your table schema)
+        # polarization_analysis table columns:
+        # 0:id,1:platform,2:category,3:analysis_type,4:analysis_date,5:week_number,6:month_number,7:year,
+        # 8:total_products,9:polarization_score,10:polarization_level,11:silhouette_score,
+        # 12:cluster_data,13:feature_importance,14:top_products
+        
+        data = {
+            'platform': row[1],
+            'category': row[2],
+            'analysis_type': row[3],
+            'analysis_date': row[4],
+            'total_products': row[8],
+            'polarization_score': row[9],
+            'polarization_level': row[10],
+            'silhouette_score': row[11],
+            'clusters': json.loads(row[12]) if row[12] else [],
+            'top_products': json.loads(row[14]) if row[14] else []
+        }
+        
+        print(f"✅ Found data: {data['platform']}/{data['category']} - Score: {data['polarization_score']}")
+        
+        # Create CSV
+        output = StringIO()
+        writer = csv.writer(output)
+        
+        writer.writerow(['Platform', 'Category', 'Analysis Type', 'Analysis Date', 
+                        'Total Products', 'Polarization Score', 'Polarization Level', 'Silhouette Score'])
+        
+        writer.writerow([
+            data['platform'],
+            data['category'],
+            data['analysis_type'],
+            str(data['analysis_date']),
+            data['total_products'],
+            data['polarization_score'],
+            data['polarization_level'],
+            data['silhouette_score']
+        ])
+        
+        writer.writerow([])
+        writer.writerow(['CLUSTER DETAILS'])
+        writer.writerow(['Cluster Label', 'Size', 'Avg Price', 'Avg Rating', 'Percentage'])
+        
+        for cluster in data['clusters']:
+            writer.writerow([
+                cluster.get('label', ''),
+                cluster.get('size', 0),
+                cluster.get('avg_price', 0),
+                cluster.get('avg_rating', 0),
+                cluster.get('percentage', 0)
+            ])
+        
+        writer.writerow([])
+        writer.writerow(['TOP 10 PRODUCTS'])
+        writer.writerow(['Rank', 'Product Name', 'Price', 'Rating', 'Reviews', 'Popularity', 'Cluster'])
+        
+        for idx, product in enumerate(data['top_products'][:10], 1):
+            writer.writerow([
+                idx,
+                product.get('name', ''),
+                product.get('price', 0),
+                product.get('rating', 0),
+                product.get('reviews', 0),
+                product.get('popularity_score', 0),
+                product.get('cluster_label', '')
+            ])
+        
+        output.seek(0)
+        filename = f"{platform}_{category}_{data['analysis_type']}_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Export error: {str(e)}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+#Serve frontend HTML file
+frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
+
+@app.get("/", response_class=HTMLResponse)
+@app.get("/index.html", response_class=HTMLResponse)
+async def serve_frontend():
+    index_path = os.path.join(frontend_path, "index.html")
+    if os.path.exists(index_path):
+        with open(index_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>Frontend not found. Please check folder structure.</h1>", status_code=404)
+
+
+
+
+@app.get("/test")
+def test():
+    return {"message": "working"}
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5000", "http://127.0.0.1:5000", "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 # Data models
 class Product(BaseModel):
     name: str
@@ -50,183 +215,253 @@ class PolarizationAnalysis(BaseModel):
     data_source: str
     csv_file_used: str
     silhouette_score: float
+    analysis_type: Optional[str] = "current"
+
+class TimeComparisonResponse(BaseModel):
+    current: Optional[Dict]
+    weekly_avg: Optional[float]
+    monthly_avg: Optional[float]
+    weekly_trend: Optional[str]
+    monthly_trend: Optional[str]
+    historical_data: Dict
 
 class AnalysisRequest(BaseModel):
-    platform: str  # "daraz" or "etsy"
+    platform: str
     category: str
     subcategory: str
     max_products: Optional[int] = 100
+    analysis_type: Optional[str] = "current"  # current, weekly, monthly
+    save_to_db: Optional[bool] = True
 
+class CustomAnalysisRequest(BaseModel):
+    platform: str
+    category: str
+    unit: str  # 'days' ya 'weeks'
+    duration: int  # 3,5,7 for days / 2,3,4 for weeks
+    max_products: Optional[int] = 50
+
+class AnalysisParams(BaseModel):
+    k_value: int = 3
+    price_weight: float = 1.0
+    rating_weight: float = 1.0
+    reviews_weight: float = 1.0
+    popularity_weight: float = 1.0
+
+# Store parameters in session (temporary)
+analysis_params = {
+    "k_value": 3,
+    "weights": {
+        "price": 1.0,
+        "rating": 1.0,
+        "reviews": 1.0,
+        "popularity": 1.0
+    }
+}
+
+# ========== RESEARCH ANALYST PARAMETERS ENDPOINTS ==========
+
+# Store parameters per user
+research_analyst_params = {}
+
+@app.get("/api/get-params")
+async def get_parameters(username: str = None, role: str = None):
+    """Get current parameters for the user"""
+    print(f"📊 Get params called: username={username}, role={role}")
+    
+    # Default parameters for all users
+    default_params = {
+        "k_value": 3,
+        "weights": {
+            "price": 1.0,
+            "rating": 1.0,
+            "reviews": 1.0,
+            "popularity": 1.0
+        }
+    }
+    
+    # Only Research Analyst can have custom parameters
+    if role == "Research Analyst" and username and username in research_analyst_params:
+        print(f"✅ Returning custom params for {username}")
+        return research_analyst_params[username]
+    
+    print(f"✅ Returning default params for {role}")
+    return default_params
+
+
+class AnalysisParams(BaseModel):
+    k_value: int = 3
+    price_weight: float = 1.0
+    rating_weight: float = 1.0
+    reviews_weight: float = 1.0
+    popularity_weight: float = 1.0
+
+
+@app.post("/api/set-params")
+async def set_parameters(
+    params: AnalysisParams, 
+    username: str = None, 
+    role: str = None
+):
+    """Set analysis parameters - ONLY for Research Analyst"""
+    print(f"📊 Set params called: username={username}, role={role}")
+    print(f"   Params: k={params.k_value}, weights=[{params.price_weight}, {params.rating_weight}, {params.reviews_weight}, {params.popularity_weight}]")
+    
+    # ✅ Strict role check
+    if role != "Research Analyst":
+        raise HTTPException(
+            status_code=403, 
+            detail="Access denied. Only Research Analyst can adjust parameters."
+        )
+    
+    if not username:
+        raise HTTPException(status_code=401, detail="Username required")
+    
+    # Save parameters for this Research Analyst
+    research_analyst_params[username] = {
+        "k_value": params.k_value,
+        "weights": {
+            "price": params.price_weight,
+            "rating": params.rating_weight,
+            "reviews": params.reviews_weight,
+            "popularity": params.popularity_weight
+        }
+    }
+    
+    print(f"✅ Parameters saved for {username}")
+    return {"message": "Parameters updated successfully", "params": research_analyst_params[username]}
+@app.post("/api/set-params")
+async def set_parameters(params: AnalysisParams):
+    """Set analysis parameters for Research Analyst"""
+    global analysis_params
+    analysis_params["k_value"] = params.k_value
+    analysis_params["weights"]["price"] = params.price_weight
+    analysis_params["weights"]["rating"] = params.rating_weight
+    analysis_params["weights"]["reviews"] = params.reviews_weight
+    analysis_params["weights"]["popularity"] = params.popularity_weight
+    return {"message": "Parameters updated successfully", "params": analysis_params}
 # Global variables for CSV data
 DARAZ_DATASETS = {}
-ETSY_DATA = []
+ETSY_DATASETS = {}
 CSV_FILES_FOUND = {
     "daraz": False,
     "etsy": False
 }
 
 print("\n" + "="*60)
-print("🚀 PRODUCT POLARIZATION API - CSV ONLY MODE")
+print("🚀 PRODUCT POLARIZATION API - TIME-BASED ANALYSIS")
 print("="*60)
 
+def get_db_connection():
+    """Get database connection with timeout"""
+    import sqlite3
+    from database import DB_PATH
+    conn = sqlite3.connect(DB_PATH, timeout=20.0)
+    conn.execute("PRAGMA journal_mode=WAL")
+    return conn
+
 def load_csv_data():
-    """Load data from CSV files - MULTIPLE DARAZ CATEGORIES"""
-    global DARAZ_DATASETS, ETSY_DATA, CSV_FILES_FOUND
+    """Load data from CSV files"""
+    global DARAZ_DATASETS, ETSY_DATASETS, CSV_FILES_FOUND
     
     print("\n📂 LOADING CSV DATA...")
-    print("⚠️ Note: This API uses ONLY CSV data. No sample data will be generated.")
     
     base_dir = os.path.dirname(os.path.abspath(__file__))
     
-    # -----------------------------
-    # DARAZ MULTI-CATEGORY FILES
-    # -----------------------------
     daraz_files = {
-        "earpods": [
-            os.path.join(base_dir, "latest_data.csv"),
-            os.path.join(base_dir, "data", "latest_data.csv"),
-            "latest_data.csv"
-        ],
-        "powerbanks": [
-            os.path.join(base_dir, "powerbanks.csv"),
-            os.path.join(base_dir, "data", "powerbanks.csv"),
-            "powerbanks.csv"
-        ]
+        "earpods": [os.path.join(base_dir, "earpods.csv"), os.path.join(base_dir, "data", "earpods.csv"), "earpods.csv"],
+        "powerbanks": [os.path.join(base_dir, "powerbanks.csv"), os.path.join(base_dir, "data", "powerbanks.csv"), "powerbanks.csv"],
+        "gaming_accessories": [os.path.join(base_dir, "gaming_accessories.csv"), os.path.join(base_dir, "data", "gaming_accessories.csv"), "gaming_accessories.csv"],
+        "mobile_phone_accessories": [os.path.join(base_dir, "mobile_phone_accessories.csv"), os.path.join(base_dir, "data", "mobile_phone_accessories.csv"), "mobile_phone_accessories.csv"],
+        "smart_watches": [os.path.join(base_dir, "smart_watches.csv"), os.path.join(base_dir, "data", "smart_watches.csv"), "smart_watches.csv"]
     }
 
-    daraz_loaded = False
-
-    # Load each category separately
     for category, paths in daraz_files.items():
         for path in paths:
             if os.path.exists(path):
                 try:
                     print(f"📖 Reading Daraz {category} CSV from: {path}")
                     df = pd.read_csv(path, encoding='utf-8')
-
-                    # Clean data
                     df = df.dropna(how='all')
                     df = df.fillna('')
-
-                    # Store separately
                     DARAZ_DATASETS[category] = df.to_dict('records')
                     CSV_FILES_FOUND[f"daraz_{category}"] = True
-                    CSV_FILES_FOUND["daraz"] = True   # ✅ ADD THIS
-                    daraz_loaded = True
-
+                    CSV_FILES_FOUND["daraz"] = True
                     print(f"✅ Loaded {len(DARAZ_DATASETS[category])} {category} products")
-
-                    daraz_loaded = True
                     break
                 except Exception as e:
                     print(f"❌ Failed to load {path}: {str(e)}")
                     continue
 
-    # -----------------------------
-    # ETSY (UNCHANGED)
-    # -----------------------------
-    possible_paths_etsy = [
-        os.path.join(base_dir, "etsy.csv"),
-        os.path.join(base_dir, "data", "etsy.csv"),
-        "etsy.csv",
-        "./etsy.csv",
-        "../etsy.csv"
-    ]
+    etsy_files = {
+        "art": [os.path.join(base_dir, "art.csv"), os.path.join(base_dir, "data", "art.csv"), "art.csv"],
+        "handmade": [os.path.join(base_dir, "handmade.csv"), os.path.join(base_dir, "data", "handmade.csv"), "handmade.csv"],
+        "jewelry": [os.path.join(base_dir, "jewelry.csv"), os.path.join(base_dir, "data", "jewelry.csv"), "jewelry.csv"],
+        "vintage": [os.path.join(base_dir, "vintage.csv"), os.path.join(base_dir, "data", "vintage.csv"), "vintage.csv"],
+        "accessories": [os.path.join(base_dir, "accessories.csv"), os.path.join(base_dir, "data", "accessories.csv"), "accessories.csv"]
+    }
 
-    etsy_loaded = False
-    etsy_path_used = ""
+    for category, paths in etsy_files.items():
+        for path in paths:
+            if os.path.exists(path):
+                try:
+                    print(f"📖 Reading Etsy {category} CSV from: {path}")
+                    df = pd.read_csv(path, encoding='utf-8')
+                    df = df.dropna(how='all')
+                    df = df.fillna('')
+                    ETSY_DATASETS[category] = df.to_dict('records')
+                    CSV_FILES_FOUND[f"etsy_{category}"] = True
+                    CSV_FILES_FOUND["etsy"] = True
+                    print(f"✅ Loaded {len(ETSY_DATASETS[category])} {category} products")
+                    break
+                except Exception as e:
+                    print(f"❌ Failed to load {path}: {str(e)}")
 
-    for path in possible_paths_etsy:
-        if os.path.exists(path):
-            try:
-                print(f"📖 Reading Etsy CSV from: {path}")
-                df = pd.read_csv(path, encoding='utf-8')
-
-                df = df.dropna(how='all')
-                df = df.fillna('')
-
-                ETSY_DATA = df.to_dict('records')
-                etsy_loaded = True
-                etsy_path_used = path
-                CSV_FILES_FOUND["etsy"] = True
-
-                print(f"✅ SUCCESS: Loaded {len(ETSY_DATA)} Etsy products")
-                break
-            except Exception as e:
-                print(f"❌ Failed to load {path}: {str(e)}")
-                continue
-
-    # -----------------------------
-    # STATUS OUTPUT
-    # -----------------------------
-    print("\n" + "="*60)
-    print("📊 CSV FILE STATUS:")
-
-    if daraz_loaded:
-        print("✅ Daraz Categories Loaded:")
-        for category, data in DARAZ_DATASETS.items():
-            print(f"   - {category}: {len(data)} products")
-            if len(data) > 0:
-                print(f"     Sample: {data[0].get('name', 'N/A')[:50]}...")
-    else:
-        print("❌ Daraz CSV files NOT FOUND")
-        print("   Required files:")
-        print("   - earpods.csv")
-        print("   - powerbanks.csv")
-
-    if etsy_loaded:
-        print(f"\n✅ Etsy.csv: FOUND at {etsy_path_used}")
-        print(f"   - Total products: {len(ETSY_DATA)}")
-        if len(ETSY_DATA) > 0:
-            print(f"   - Sample product: {ETSY_DATA[0].get('name', 'N/A')[:50]}...")
-    else:
-        print("\n❌ Etsy.csv: NOT FOUND")
-        print("   Please place etsy.csv in the same directory as main.py")
-
-    if not daraz_loaded and not etsy_loaded:
-        print("\n⚠️ CRITICAL ERROR: No CSV files found!")
-        print("The API will not work without CSV files.")
-    else:
-        print("\n✅ CSV files loaded successfully!")
-
+    print("\n✅ CSV files loaded successfully!")
     print("="*60)
-# Load data on startup
+
+
+@app.post("/api/apify-webhook")
+async def apify_webhook(request: dict):
+    print("\n🔥 WEBHOOK RECEIVED")
+    print("FULL DATA:")
+    print(request)
+
+    # Extract category (we will use later)
+    category = request.get("resource", {}).get("input", {}).get("category")
+
+    print("CATEGORY RECEIVED:", category)
+
+    return {"status": "received", "category": category}
+
 load_csv_data()
+
+# Start the background scheduler
+start_scheduler()
+
 
 # Helper functions for data cleaning
 def clean_price(price_str, platform):
-    """Clean price string based on platform"""
     if not isinstance(price_str, str):
         price_str = str(price_str)
     
-    original = price_str
-    
-    # Remove currency symbols and commas
     if platform == 'daraz':
         price_str = price_str.replace('Rs.', '').replace('Rs', '').replace('rs', '')
         price_str = price_str.replace('PKR', '').replace('pkr', '')
-    else:  # etsy
+    else:
         price_str = price_str.replace('$', '').replace('USD', '').replace('usd', '')
     
     price_str = price_str.replace(',', '').replace('+', '').replace('~', '').strip()
-    
-    # Extract numeric part using regex
     numbers = re.findall(r'\d+\.?\d*', price_str)
     if numbers:
         try:
             return float(numbers[0])
         except:
             pass
-    
-    # If no numbers found, return 0
-    print(f"⚠️ Could not parse price: '{original}' -> returning 0")
     return 0.0
 
 def clean_rating(rating_str):
-    """Convert rating to float"""
     if not rating_str or rating_str == '':
         return 0.0
-    
     try:
         if isinstance(rating_str, (int, float)):
             return float(rating_str)
@@ -238,16 +473,13 @@ def clean_rating(rating_str):
     return 0.0
 
 def clean_reviews(reviews_str):
-    """Convert reviews to integer"""
     if not reviews_str or reviews_str == '':
         return 0
-    
     try:
         if isinstance(reviews_str, (int, float)):
             return int(reviews_str)
         reviews_str = str(reviews_str).strip()
         if reviews_str and reviews_str != '':
-            # Extract numbers only
             numbers = re.findall(r'\d+', reviews_str)
             if numbers:
                 return int(numbers[0])
@@ -256,40 +488,27 @@ def clean_reviews(reviews_str):
     return 0
 
 def extract_daraz_products(subcategory, limit=100):
-    """Extract and clean Daraz products from CSV only"""
     products = []
     data = DARAZ_DATASETS.get(subcategory.lower())
     if not data:
         raise Exception(f"No data found for subcategory: {subcategory}")
     
-    print(f"\n📦 Processing Daraz products from CSV...")
-    
     for idx, item in enumerate(data):
         if len(products) >= limit:
             break
-            
         try:
-            # Get product name
             name = str(item.get('name', ''))
             if not name or len(name) < 3 or name == 'nan':
                 continue
             
-            # Get price
             price_str = str(item.get('price', '0'))
             price = clean_price(price_str, 'daraz')
-            
-            # Skip if price is 0 (invalid)
             if price <= 0:
                 continue
             
-            # Get rating
-           # Replace the rating line with:
             rating = clean_rating(item.get('ratingScore', item.get('seller_rating', '0')))
-            
-            # Get reviews (itemSold)
             reviews = clean_reviews(item.get('itemSold', '0'))
             
-            # Get seller and brand
             seller = str(item.get('sellerName', 'Unknown Seller'))
             if seller == 'nan':
                 seller = 'Unknown Seller'
@@ -298,8 +517,6 @@ def extract_daraz_products(subcategory, limit=100):
             if brand == 'nan':
                 brand = 'No Brand'
             
-            # Calculate popularity score (0-1 based on reviews)
-            # Using max 1000 reviews as reference
             popularity = min(1.0, reviews / 1000) if reviews > 0 else 0.1
             
             products.append({
@@ -309,64 +526,42 @@ def extract_daraz_products(subcategory, limit=100):
                 'reviews': reviews,
                 'popularity': popularity,
                 'seller': seller[:50],
-                'brand': brand[:30],
-                'original_price': price_str
+                'brand': brand[:30]
             })
-            
         except Exception as e:
-            print(f"⚠️ Error processing Daraz product {idx}: {str(e)}")
             continue
     
-    print(f"✅ Extracted {len(products)} valid Daraz products")
     return products
-    print("Available keys:", DARAZ_DATASETS.keys())
-    print("Requested:", subcategory)
 
-def extract_etsy_products(limit=100):
-    """Extract and clean Etsy products from CSV only"""
+def extract_etsy_products(subcategory, limit=100):
     products = []
-    
-    if not ETSY_DATA:
-        raise Exception("No Etsy CSV data available. Please ensure etsy.csv exists.")
-    
-    print(f"\n🛍️ Processing Etsy products from CSV...")
-    
-    for idx, item in enumerate(ETSY_DATA):
+    data = ETSY_DATASETS.get(subcategory.lower())
+    if not data:
+        raise Exception(f"No Etsy data found for subcategory: {subcategory}")
+
+    for idx, item in enumerate(data):
         if len(products) >= limit:
             break
-            
         try:
-            # Get product name
             name = str(item.get('name', ''))
             if not name or len(name) < 3 or name == 'nan':
                 continue
-            
-            # Get price
+
             price_str = str(item.get('Price', '0'))
             price = clean_price(price_str, 'etsy')
-            
-            # Skip if price is 0 (invalid)
             if price <= 0:
                 continue
-            
-            # Get rating
-           # Replace the rating line with:
+
             rating = clean_rating(item.get('ratingScore', item.get('seller_rating', '0')))
-            
-            # Get reviews
             reviews = clean_reviews(item.get('numberOfReviews', '0'))
-            
-            # Get favorites (as popularity)
             favorites = clean_reviews(item.get('favorites', '0'))
-            
-            # Get seller
+
             seller = str(item.get('seller_name', 'Unknown Seller'))
             if seller == 'nan':
                 seller = 'Unknown Seller'
-            
-            # Calculate popularity score (0-1 based on favorites)
+
             popularity = min(1.0, favorites / 3000) if favorites > 0 else 0.1
-            
+
             products.append({
                 'name': name[:100],
                 'price': price,
@@ -374,95 +569,68 @@ def extract_etsy_products(limit=100):
                 'reviews': reviews,
                 'popularity': popularity,
                 'seller': seller[:50],
-                'brand': 'Etsy Handmade',
-                'original_price': price_str
+                'brand': 'Etsy Handmade'
             })
-            
         except Exception as e:
-            print(f"⚠️ Error processing Etsy product {idx}: {str(e)}")
             continue
-    
-    print(f"✅ Extracted {len(products)} valid Etsy products")
+
     return products
 
-def normalize_features(products):
-    """Normalize features for clustering"""
+def normalize_features(products, weights=None):
     if not products:
         return products
     
-    # Extract features
+    if weights is None:
+        weights = {"price": 1.0, "rating": 1.0, "reviews": 1.0, "popularity": 1.0}
+    
     prices = [p['price'] for p in products]
     ratings = [p['rating'] for p in products]
     reviews = [p['reviews'] for p in products]
-    popularities = [p['popularity'] for p in products]
     
-    # Min-max normalization
     price_min, price_max = min(prices), max(prices)
     review_min, review_max = min(reviews), max(reviews)
     
     for p in products:
-        # Price normalization (0-1)
+        # Apply weights to normalized values
         if price_max > price_min:
-            p['price_norm'] = (p['price'] - price_min) / (price_max - price_min)
+            p['price_norm'] = (p['price'] - price_min) / (price_max - price_min) * weights['price']
         else:
-            p['price_norm'] = 0.5
+            p['price_norm'] = 0.5 * weights['price']
         
-        # Rating normalization (already 0-5)
-        p['rating_norm'] = p['rating'] / 5.0 if p['rating'] > 0 else 0.1
+        p['rating_norm'] = (p['rating'] / 5.0 if p['rating'] > 0 else 0.1) * weights['rating']
         
-        # Review normalization
         if review_max > review_min:
-            p['review_norm'] = (p['reviews'] - review_min) / (review_max - review_min)
+            p['review_norm'] = (p['reviews'] - review_min) / (review_max - review_min) * weights['reviews']
         else:
-            p['review_norm'] = 0.5
+            p['review_norm'] = 0.5 * weights['reviews']
         
-        # Popularity already normalized
-        p['popularity_norm'] = p['popularity']
+        p['popularity_norm'] = p['popularity'] * weights['popularity']
     
     return products
-
 def calculate_ranking_score(product):
-    """Calculate ranking score for top products"""
-    # Weights: Rating 35%, Reviews 30%, Popularity 20%, Price 15%
-    score = (
-        product['rating_norm'] * 0.35 +
-        product['review_norm'] * 0.30 +
-        product['popularity_norm'] * 0.20 +
-        (1 - product['price_norm']) * 0.15  # Lower price is better
-    )
+    score = (product['rating_norm'] * 0.35 +
+             product['review_norm'] * 0.30 +
+             product['popularity_norm'] * 0.20 +
+             (1 - product['price_norm']) * 0.15)
     return score
 
-def apply_clustering(products, n_clusters=3):
-    """Apply K-Means clustering to products"""
+def apply_clustering(products, n_clusters=3, weights=None):
     if len(products) < n_clusters:
         n_clusters = max(2, len(products))
     
-    # Prepare feature matrix
-    features = []
-    for p in products:
-        features.append([
-            p['price_norm'],
-            p['rating_norm'],
-            p['review_norm'],
-            p['popularity_norm']
-        ])
-    
+    features = [[p['price_norm'], p['rating_norm'], p['review_norm'], p['popularity_norm']] for p in products]
     X = np.array(features)
     
-    # Apply clustering
     kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
     clusters = kmeans.fit_predict(X)
     
-    # Calculate cluster centers and sort by price
     centers = kmeans.cluster_centers_
     center_prices = [center[0] for center in centers]
     sorted_indices = np.argsort(center_prices)
     
-    # Map original clusters to sorted labels
     cluster_map = {old: new for new, old in enumerate(sorted_indices)}
     mapped_clusters = [cluster_map[c] for c in clusters]
     
-    # Assign labels based on price order
     labels = []
     for i in range(n_clusters):
         if i == 0:
@@ -472,13 +640,11 @@ def apply_clustering(products, n_clusters=3):
         else:
             labels.append("Mid-Range")
     
-    # Add clusters to products
     for i, p in enumerate(products):
         p['cluster'] = int(mapped_clusters[i])
         p['cluster_label'] = labels[mapped_clusters[i]]
         p['ranking_score'] = calculate_ranking_score(p)
 
-        # Inside apply_clustering (after K-Means)
     sil_score = 0.0
     if n_clusters >= 2 and len(products) >= n_clusters:
         try:
@@ -486,25 +652,27 @@ def apply_clustering(products, n_clusters=3):
         except:
             sil_score = 0.0
 
-    return products, centers, labels, sil_score   # ← Added sil_score
-
-
+    return products, centers, labels, sil_score
 def calculate_polarization_score(products, centers, n_clusters):
-    """Final Polished Polarization Score - Ready for FYP Submission"""
-    if len(centers) < 2 or len(products) < 20:
-        return 0.55
+    """Calculate polarization score based on cluster separation"""
     
-    # Inter-cluster separation
+    if len(centers) < 2 or len(products) < 10:
+        return 0.50
+    
+    # Calculate between-cluster distances (how far apart clusters are)
     distances = []
     for i in range(len(centers)):
         for j in range(i + 1, len(centers)):
             dist = np.linalg.norm(centers[i] - centers[j])
             distances.append(dist)
     
-    avg_inter_dist = np.mean(distances)
-    max_dist = np.sqrt(4)
+    avg_inter_dist = np.mean(distances) if distances else 0.5
     
-    # Intra-cluster variance penalty
+    # Max possible distance in normalized space (0-1 for each dimension)
+    # 4 dimensions: price_norm, rating_norm, review_norm, popularity_norm
+    max_possible_dist = np.sqrt(4)  # = 2.0
+    
+    # Calculate within-cluster variance (how tight clusters are)
     intra_vars = []
     for c in range(n_clusters):
         feats = [[p['price_norm'], p['rating_norm'], p['review_norm'], p['popularity_norm']] 
@@ -512,18 +680,26 @@ def calculate_polarization_score(products, centers, n_clusters):
         if len(feats) > 1:
             intra_vars.append(np.var(feats, axis=0).mean())
     
-    avg_intra = np.mean(intra_vars) if intra_vars else 0.0
+    avg_intra = np.mean(intra_vars) if intra_vars else 0.1
     
-    # Balanced & natural scaling
-    raw_score = avg_inter_dist / (max_dist * 0.9 + avg_intra * 6)
-    polarization_score = min(0.96, max(0.45, raw_score * 2.05))
+    # Polarization formula: 
+    # Higher inter-cluster distance = more polarization
+    # Lower intra-cluster variance = more polarization
+    if avg_intra == 0:
+        avg_intra = 0.01
+    
+    # Raw score between 0 and 1
+    raw_score = (avg_inter_dist / max_possible_dist) * (1 / (1 + avg_intra))
+    
+    # Scale to 0.2 to 0.95 range
+    polarization_score = 0.2 + (raw_score * 0.75)
+    
+    # Clamp to valid range
+    polarization_score = max(0.20, min(0.95, polarization_score))
     
     return round(polarization_score, 3)
 
-
-
 def get_polarization_level(score):
-    """Convert polarization score to descriptive level"""
     if score < 0.25:
         return "Low Polarization"
     elif score < 0.45:
@@ -532,144 +708,262 @@ def get_polarization_level(score):
         return "High Polarization"
     else:
         return "Very High Polarization"
+    
+@app.post("/api/analyze-custom")
+async def analyze_custom_duration(request: CustomAnalysisRequest):
+    """
+    Custom duration analysis
+    request.unit = 'days' ya 'weeks'
+    request.duration = 3, 5, 7 (for days) ya 2, 3, 4 (for weeks)
+    """
+    
+    platform = request.platform
+    category = request.category.lower()
+    unit = request.unit
+    duration = request.duration
+
+    if platform == "daraz":
+        platform = "Daraz.pk"
+    elif platform == "etsy":
+        platform = "Etsy.com"
+    
+    
+    from database import get_daily_snapshots, get_weekly_snapshots
+    from datetime import datetime, timedelta
+    import pandas as pd
+    
+    if unit == 'days':
+        # Get ALL data without date filter
+        snapshots = get_daily_snapshots(platform, category)  # No start_date/end_date
+        
+        print(f"📊 Raw data from database for {category}:")
+        
+        if len(snapshots) == 0:
+            print("   No data found in daily_snapshots table!")
+            return await calculate_from_csv(platform, category)
+        
+        data = []
+        for s in snapshots:
+            print(f"   {s['date']} -> {s['polarization_score']}")
+            data.append({'snapshot_date': s['date'], 'polarization_score': s['polarization_score']})
+        
+        df = pd.DataFrame(data)
+        
+        # Take last 'duration' records
+        if len(df) > duration:
+            df = df.tail(duration)
+        
+        # ✅ SET START_DATE AND END_DATE FROM AVAILABLE DATA
+        if len(df) > 0:
+            start_date = datetime.strptime(str(df['snapshot_date'].iloc[0]), '%Y-%m-%d')
+            end_date = datetime.strptime(str(df['snapshot_date'].iloc[-1]), '%Y-%m-%d')
+        else:
+            start_date = datetime.now()
+            end_date = datetime.now()
+        
+        print(f"📅 Date range: {start_date.date()} to {end_date.date()}")
+        
+    elif unit == 'weeks':
+        # Get weekly data from database
+        snapshots = get_weekly_snapshots(platform, category, duration * 2)
+    
+        print(f"📊 Raw weekly data from database for {category}:")
+    
+        if len(snapshots) == 0:
+            print("   No weekly data found! Run Weekly Analysis first.")
+            # Fallback to daily data if no weekly data
+            return await calculate_from_csv(platform, category)
+    
+        data = []
+        for s in snapshots:
+            # Ensure date is properly formatted
+            date_val = s['date']
+            if isinstance(date_val, str):
+                date_val = date_val.split(' ')[0]  # Remove time part if exists
+            print(f"   {date_val} -> {s['polarization_score']}")
+            data.append({'analysis_date': date_val, 'polarization_score': s['polarization_score']})
+        
+        df = pd.DataFrame(data)
+        
+        if len(df) > duration:
+            df = df.tail(duration)
+        
+        # ✅ SET START_DATE AND END_DATE FROM AVAILABLE DATA
+        if len(df) > 0:
+            # Pehle string ko split karke sirf date part lo
+            date_str = str(df['analysis_date'].iloc[0]).split(' ')[0]  # "2026-05-30 20:02:56" -> "2026-05-30"
+            start_date = datetime.strptime(date_str, '%Y-%m-%d')
+            date_str_end = str(df['analysis_date'].iloc[-1]).split(' ')[0]
+            end_date = datetime.strptime(date_str_end, '%Y-%m-%d')
+        else:
+            start_date = datetime.now()
+            end_date = datetime.now()
+    
+    else:
+        raise HTTPException(status_code=400, detail="Invalid unit. Use 'days' or 'weeks'")
+    
+    if df.empty:
+        return await calculate_from_csv(platform, category)
+    
+    avg_polarization = df['polarization_score'].mean()
+    
+    if len(df) >= 2:
+        first_score = df['polarization_score'].iloc[0]
+        last_score = df['polarization_score'].iloc[-1]
+        if last_score > first_score * 1.05:
+            trend = "increasing"
+        elif last_score < first_score * 0.95:
+            trend = "decreasing"
+        else:
+            trend = "stable"
+    else:
+        trend = "stable"
+    
+    result = {
+        "platform": platform,
+        "category": category,
+        "duration": duration,
+        "unit": unit,
+        "start_date": start_date.strftime('%Y-%m-%d'),
+        "end_date": end_date.strftime('%Y-%m-%d'),
+        "avg_polarization_score": round(avg_polarization, 4),
+        "trend": trend,
+        "data_points": len(df),
+        "daily_scores": [float(x) for x in df['polarization_score'].tolist()],
+        "dates": [str(x) for x in (df['snapshot_date'].tolist() if unit == 'days' else df['analysis_date'].tolist())]
+    }
+    
+    print(f"✅ Returning {result['data_points']} days, scores: {result['daily_scores']}")
+    print(f"📅 Start: {result['start_date']}, End: {result['end_date']}")
+    return result
+
+async def calculate_from_csv(platform, category):
+    """Fallback function jab database mein data nahi ho"""
+    # Create a request object
+    request = AnalysisRequest(
+        platform=platform,
+        category=category,
+        subcategory=category,
+        max_products=50,
+        analysis_type='current',
+        save_to_db=True
+    )
+    result = await analyze_polarization(request)
+    
+    # ✅ FIX: result ek dictionary hai, object nahi
+    return {
+        "platform": platform,
+        "category": category,
+        "duration": 0,
+        "unit": "days",
+        "start_date": datetime.now().strftime('%Y-%m-%d'),
+        "end_date": datetime.now().strftime('%Y-%m-%d'),
+        "avg_polarization_score": result.get('polarization_score', 0.5),  # <-- FIXED
+        "trend": "stable",
+        "data_points": 1,
+        "daily_scores": [result.get('polarization_score', 0.5)],  # <-- FIXED
+        "dates": [datetime.now().strftime('%Y-%m-%d')],
+        "note": "Using current data (no historical data available)"
+    }
 # API Endpoints
 @app.get("/")
 def read_root():
-    """Root endpoint with CSV status"""
     return {
-        "message": "Product Polarization API - CSV ONLY MODE",
-        "version": "3.0.0",
-        "csv_status": {
-            "daraz": {
-                "found": CSV_FILES_FOUND["daraz"],
-                "product_count": len(DARAZ_DATASETS)
-            },
-            "etsy": {
-                "found": CSV_FILES_FOUND["etsy"],
-                "product_count": len(ETSY_DATA)
-            }
-        },
-        "note": "This API uses ONLY CSV data. No sample data is generated.",
-        "endpoints": {
-            "GET /": "This info",
-            "GET /api/platforms": "Get available platforms",
-            "POST /api/analyze": "Run polarization analysis",
-            "GET /api/csv-status": "Check CSV files status"
+        "message": "Product Polarization API - Time-Based Analysis",
+        "version": "5.0.0",
+        "features": {
+            "current_analysis": "Get current polarization score",
+            "weekly_analysis": "Get weekly polarization trends",
+            "monthly_analysis": "Get monthly polarization trends",
+            "comparison": "Compare current vs weekly vs monthly",
+            "historical_data": "Get complete historical data"
         }
     }
 
-@app.get("/api/csv-status")
-def csv_status():
-    """Detailed CSV file status"""
-    return {
-        "daraz": {
-            "file_exists": CSV_FILES_FOUND["daraz"],
-            "products_loaded": len(DARAZ_DATASETS),
-            "sample": next(iter(DARAZ_DATASETS.values()))[0] if DARAZ_DATASETS else None
-        },
-        "etsy": {
-            "file_exists": CSV_FILES_FOUND["etsy"],
-            "products_loaded": len(ETSY_DATA),
-            "sample": ETSY_DATA[0] if ETSY_DATA else None
-        }
-    }
-
-@app.get("/api/platforms")
-def get_platforms():
-    """Get available platforms with CSV data status"""
-    platforms = []
-    
-    if CSV_FILES_FOUND["daraz"]:
-        platforms.append({
-            "id": "daraz",
-            "name": "Daraz.pk",
-            "currency": "PKR",
-            "categories": ["Earbuds", "Headphones", "Mobile Accessories"],
-            "data_loaded": True,
-            "product_count": len(DARAZ_DATASETS),
-            "csv_file": "daraz.csv"
-        })
-    
-    if CSV_FILES_FOUND["etsy"]:
-        platforms.append({
-            "id": "etsy",
-            "name": "Etsy.com",
-            "currency": "USD",
-            "categories": ["Earpods", "Headphones", "Audio Accessories"],
-            "data_loaded": True,
-            "product_count": len(ETSY_DATA),
-            "csv_file": "etsy.csv"
-        })
-    
-    if not platforms:
-        return {
-            "platforms": [],
-            "error": "No CSV files found. Please ensure daraz.csv and/or etsy.csv exist."
-        }
-    
-    return {"platforms": platforms}
-
-@app.post("/api/analyze", response_model=PolarizationAnalysis)
-async def analyze_polarization(request: AnalysisRequest):
-    """Main analysis endpoint - Uses ONLY CSV data"""
+@app.post("/api/analyze")
+async def analyze_polarization(
+    request: AnalysisRequest,
+    username: str = None,
+    role: str = None
+):
+    """Main analysis endpoint with time-based analysis support"""
     try:
         print(f"\n{'='*60}")
         print(f"🔍 Analyzing {request.platform.upper()} - {request.subcategory}")
+        print(f"   Type: {request.analysis_type}")
+        print(f"   User: {username}, Role: {role}")
         print(f"{'='*60}")
         
+        # ========== GET CUSTOM PARAMETERS ==========
+        custom_k = 3
+        weights = {"price": 1.0, "rating": 1.0, "reviews": 1.0, "popularity": 1.0}
+        
+        if role == "Research Analyst" and username and username in research_analyst_params:
+            custom_k = research_analyst_params[username].get("k_value", 3)
+            weights = research_analyst_params[username].get("weights", weights)
+            print(f"📊 USING CUSTOM PARAMETERS: k={custom_k}, weights={weights}")
+        else:
+            print(f"📊 Using DEFAULT parameters")
+        
+        # ========== PLATFORM SELECTION & DATA EXTRACTION ==========
         if request.platform.lower() == "daraz":
-            subcategory = request.subcategory.lower().replace(" ", "")
+            subcategory = request.subcategory.lower().replace(" ", "_")
             if subcategory not in DARAZ_DATASETS:
-                raise HTTPException(
-                status_code=404,
-                detail=f"No CSV found for subcategory: {request.subcategory}"
-                 )
-
+                raise HTTPException(status_code=404, detail=f"No CSV found for subcategory: {request.subcategory}")
             products = extract_daraz_products(subcategory, request.max_products)
             platform_name = "Daraz.pk"
-            csv_file = "latest_data.csv"
-
+            csv_file = f"{subcategory}.csv"
         elif request.platform.lower() == "etsy":
-            if not ETSY_DATA:
-                 raise HTTPException(
-                 status_code=404, 
-                 detail="Etsy.csv not found. Please ensure the file exists."
-                 )
-
-            products = extract_etsy_products(request.max_products)
+            subcategory = request.subcategory.lower().replace(" ", "_")
+            if subcategory not in ETSY_DATASETS:
+                raise HTTPException(status_code=404, detail=f"No CSV found for Etsy subcategory: {request.subcategory}")
+            products = extract_etsy_products(subcategory, request.max_products)
             platform_name = "Etsy.com"
-            csv_file = "etsy.csv"
-
+            csv_file = f"{subcategory}.csv"
         else:
-            raise HTTPException(
-                status_code=400, 
-                detail="Invalid platform. Choose 'daraz' or 'etsy'"
-                 )
+            raise HTTPException(status_code=400, detail="Invalid platform")
+        
         if not products:
-            raise HTTPException(
-                status_code=404, 
-                detail=f"No valid products found in {csv_file}. Please check the file format."
-            )
+            raise HTTPException(status_code=404, detail=f"No valid products found")
         
-        print(f"📊 Processing {len(products)} products")
+        # Debug output
+        print(f"\n🔍 ===== DEBUG for {request.subcategory} =====")
+        print(f"📦 Total products: {len(products)}")
+        if products:
+            prices = [p['price'] for p in products[:10]]
+            ratings = [p['rating'] for p in products[:10]]
+            print(f"💰 Sample prices: {prices[:5]}")
+            print(f"⭐ Sample ratings: {ratings[:5]}")
+        print(f"==========================================\n")
         
-        # Normalize features
-        products = normalize_features(products)
+        # ========== NORMALIZATION & CLUSTERING ==========
+        products = normalize_features(products, weights)
+        n_clusters = min(custom_k, len(products))
+        print(f"📊 Clustering with k={n_clusters}")
         
-        # Apply clustering
-        n_clusters = min(3, len(products))
-       # === REPLACE THIS LINE (around line 636) ===
-        clustered_products, centers, cluster_labels, sil_score = apply_clustering(products, n_clusters)
-        
-        # Sort by ranking score for top products
+        clustered_products, centers, cluster_labels, sil_score = apply_clustering(products, n_clusters, weights)
         clustered_products.sort(key=lambda x: x['ranking_score'], reverse=True)
         
-        # Calculate polarization score
-             # Calculate polarization score
+        # ========== POLARIZATION SCORE ==========
         polarization_score = calculate_polarization_score(clustered_products, centers, n_clusters)
+        
+        # ========== FOR WEEKLY/MONTHLY: OVERRIDE WITH HISTORICAL AVERAGE ==========
+        if request.analysis_type in ["weekly", "monthly"]:
+            from database import get_daily_snapshots
+            days = 7 if request.analysis_type == "weekly" else 30
+            snapshots = get_daily_snapshots(platform_name, request.subcategory)
+            
+            if snapshots and len(snapshots) >= days:
+                last_n_scores = [s['polarization_score'] for s in snapshots[-days:]]
+                avg_score = sum(last_n_scores) / len(last_n_scores)
+                print(f"📊 {request.analysis_type.upper()} - Using historical average: {avg_score:.4f} (current would be: {polarization_score:.4f})")
+                polarization_score = avg_score
+            else:
+                print(f"⚠️ Not enough historical data for {request.analysis_type} (need {days}, have {len(snapshots) if snapshots else 0})")
+        
         polarization_level = get_polarization_level(polarization_score)
         
-        # Prepare cluster statistics
+        # ========== BUILD CLUSTERS INFO ==========
         clusters = []
         for i in range(n_clusters):
             cluster_products = [p for p in clustered_products if p['cluster'] == i]
@@ -685,7 +979,7 @@ async def analyze_polarization(request: AnalysisRequest):
                     "percentage": round(len(cluster_products) / len(products) * 100, 1)
                 })
         
-        # Feature importance
+        # ========== FEATURE IMPORTANCE ==========
         feature_importance = {
             "price": round(abs(centers[:, 0].max() - centers[:, 0].min()) * 100, 1),
             "rating": round(abs(centers[:, 1].max() - centers[:, 1].min()) * 100, 1),
@@ -693,7 +987,7 @@ async def analyze_polarization(request: AnalysisRequest):
             "popularity": round(abs(centers[:, 3].max() - centers[:, 3].min()) * 100, 1)
         }
         
-        # Prepare response products (Top 20)
+        # ========== RESPONSE PRODUCTS ==========
         response_products = []
         for p in clustered_products[:20]:
             response_products.append(Product(
@@ -708,27 +1002,64 @@ async def analyze_polarization(request: AnalysisRequest):
                 brand=p.get('brand')
             ))
         
-        print(f"\n✅ Analysis Complete:")
-        print(f"   Platform: {platform_name}")
-        print(f"   Products: {len(products)}")
-        print(f"   Clusters: {n_clusters}")
-        print(f"   Polarization Score: {polarization_score:.3f} ({polarization_level})")
-        print(f"   Data Source: {csv_file}")
-        
-        return PolarizationAnalysis(
+        result = PolarizationAnalysis(
             platform=platform_name,
             total_products=len(products),
             polarization_score=round(polarization_score, 3),
             polarization_level=polarization_level,
             clusters=clusters,
-            
             products=response_products,
             feature_importance=feature_importance,
             analysis_timestamp=datetime.now().isoformat(),
             data_source=f"CSV - {csv_file}",
             csv_file_used=csv_file,
-            silhouette_score=round(sil_score, 4)
+            silhouette_score=round(sil_score, 4),
+            analysis_type=request.analysis_type
         )
+        
+        # ========== SAVE TO DATABASE ==========
+        if request.save_to_db:
+            save_analysis_result(
+                platform=platform_name,
+                category=request.subcategory,
+                analysis_type=request.analysis_type,
+                analysis_date=datetime.now(),
+                total_products=len(products),
+                polarization_score=polarization_score,
+                polarization_level=polarization_level,
+                silhouette_score=sil_score,
+                clusters=clusters,
+                feature_importance=feature_importance,
+                top_products=[p.model_dump() for p in response_products]
+            )
+            
+            avg_price = np.mean([p.price for p in response_products[:10]])
+            avg_rating = np.mean([p.rating for p in response_products[:10]])
+            cluster_dist = {c['label']: c['size'] for c in clusters}
+            
+            save_time_snapshot(
+                platform=platform_name,
+                category=request.subcategory,
+                snapshot_type=request.analysis_type,
+                snapshot_date=datetime.now(),
+                polarization_score=polarization_score,
+                total_products=len(products),
+                avg_price=round(avg_price, 2),
+                avg_rating=round(avg_rating, 2),
+                cluster_distribution=cluster_dist
+            )
+            
+            save_daily_snapshot(
+                platform=platform_name,
+                category=request.subcategory,
+                snapshot_date=datetime.now().date(),
+                polarization_score=polarization_score,
+                total_products=len(products)
+            )
+            print(f"✅ Daily snapshot saved: {platform_name}/{request.subcategory}")
+        
+        print(f"✅ Analysis complete! Polarization Score: {polarization_score}")
+        return result.model_dump()
         
     except HTTPException:
         raise
@@ -736,26 +1067,93 @@ async def analyze_polarization(request: AnalysisRequest):
         print(f"❌ Error: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+@app.get("/api/comparison/{platform}/{category}")
+async def get_comparison(platform: str, category: str):
+    """Get comparison between current, weekly, and monthly polarization"""
+    try:
+        comparison = get_polarization_comparison(platform, category)
+        historical = get_all_historical_data(platform, category)
+        
+        return TimeComparisonResponse(
+            current=get_current_analysis(platform, category),
+            weekly_avg=comparison['weekly_avg'],
+            monthly_avg=comparison['monthly_avg'],
+            weekly_trend=comparison['weekly_trend'],
+            monthly_trend=comparison['monthly_trend'],
+            historical_data=historical
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/daily-products/{platform}/{category}/{date}")
+async def get_daily_products(platform: str, category: str, date: str):
+    """Get top 10 products for a specific date"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Convert date string to datetime
+        from datetime import datetime
+        target_date = datetime.strptime(date, '%Y-%m-%d').date()
+        
+        # Fetch analysis for that date
+        cursor.execute("""
+            SELECT top_products 
+            FROM polarization_analysis 
+            WHERE platform = ? AND category = ? 
+            AND DATE(analysis_date) = ?
+            ORDER BY analysis_date DESC 
+            LIMIT 1
+        """, (platform, category, target_date))
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row and row[0]:
+            products = json.loads(row[0])
+            return {"date": date, "products": products[:10], "total": len(products)}
+        else:
+            # If no data, return empty
+            return {"date": date, "products": [], "total": 0, "message": "No data available for this date"}
+            
+    except Exception as e:
+        print(f"Error: {e}")
+        return {"date": date, "products": [], "error": str(e)}
+    
+@app.get("/api/historical/{platform}/{category}")
+async def get_historical(platform: str, category: str):
+    """Get complete historical polarization data"""
+    try:
+        return {
+            "platform": platform,
+            "category": category,
+            "weekly_data": get_weekly_analysis(platform, category),
+            "monthly_data": get_monthly_analysis(platform, category),
+            "trend_data": get_trend_data(platform, category, "weekly", 12)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/collect-weekly")
+async def collect_weekly_data(background_tasks: BackgroundTasks):
+    """Manually trigger weekly data collection"""
+    from scheduler import scheduler
+    background_tasks.add_task(scheduler.collect_weekly_data)
+    return {"message": "Weekly data collection started in background"}
 
 if __name__ == "__main__":
     import uvicorn
     print("\n" + "="*60)
-    print("🌐 API STARTING - CSV ONLY MODE")
+    print("🌐 API STARTING - TIME-BASED ANALYSIS MODE")
     print("="*60)
-    
-    if not CSV_FILES_FOUND["daraz"] and not CSV_FILES_FOUND["etsy"]:
-        print("\n⚠️  WARNING: No CSV files found!")
-        print("   The API will not work without CSV files.")
-        print("   Please ensure daraz.csv and etsy.csv exist.")
-    else:
-        print("\n✅ CSV Files Status:")
-        if CSV_FILES_FOUND["daraz"]:
-            print(f"   📦 Daraz.csv: {len(DARAZ_DATASETS)} products")
-        if CSV_FILES_FOUND["etsy"]:
-            print(f"   🛍️ Etsy.csv: {len(ETSY_DATA)} products")
-    
+    print("\n📅 Features:")
+    print("   - Current polarization analysis")
+    print("   - Weekly trend analysis")
+    print("   - Monthly trend analysis")
+    print("   - Historical data comparison")
+    print("   - Automatic weekly data collection")
     print("\n🚀 Server running at: http://localhost:8000")
-    print("📊 Check CSV status: http://localhost:8000/api/csv-status")
     print("="*60)
     
     uvicorn.run(app, host="0.0.0.0", port=8000)
