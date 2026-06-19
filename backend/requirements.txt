@@ -1,9 +1,0 @@
-uvicorn
-fastapi
-pandas
-numpy
-scikit-learn
-pydantic
-python-jose[cryptography]
-passlib[bcrypt]
-python-dotenv
