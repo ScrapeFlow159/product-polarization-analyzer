@@ -85,8 +85,7 @@ login_attempts = {}
 
 @app.route('/')
 def home():
-    # Directly serve index.html instead of redirecting to register
-    return serve_index()
+    return redirect(url_for('register'))
 
 @app.route('/index.html')
 def serve_index():
