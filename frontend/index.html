@@ -1025,7 +1025,7 @@ function showDailyProducts(category, date, dayNumber, score) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
     
-    fetch(`http://localhost:8000/api/daily-products/${platform}/${cleanCategory}/${date}`)
+    fetch(`${API_BASE_URL}/api/daily-products/${platform}/${cleanCategory}/${date}`)
         .then(res => res.json())
         .then(data => {
             const content = document.getElementById('productsContent');
