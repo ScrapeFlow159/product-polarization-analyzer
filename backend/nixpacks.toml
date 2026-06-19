@@ -2,7 +2,4 @@
 nixPkgs = ["python312"]
 
 [phases.start]
-cmds = [
-  "pip install --no-cache-dir uvicorn fastapi pandas numpy scikit-learn pydantic python-jose[cryptography] passlib[bcrypt] python-dotenv",
-  "uvicorn main:app --host 0.0.0.0 --port $PORT"
-]
+cmds = ["bash build.sh"]
