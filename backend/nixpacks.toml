@@ -1,11 +1,9 @@
 [phases.setup]
-nixPkgs = ["python312", "python312Packages.pip"]
-
-[phases.install]
-cmds = [
-  "export PATH=/nix/store/*-python3-3.12.7/bin:$PATH",
-  "pip install --no-cache-dir fastapi uvicorn pandas numpy scikit-learn pydantic python-jose passlib python-dotenv"
-]
+nixPkgs = ["python312"]
 
 [phases.start]
-cmds = ["uvicorn main:app --host 0.0.0.0 --port $PORT"]
+cmds = [
+  "python -c \"import subprocess, sys; subprocess.check_call([sys.executable, '-m', 'ensurepip'])\"",
+  "python -c \"import subprocess; subprocess.check_call(['python', '-m', 'pip', 'install', '--break-system-packages', 'fastapi', 'uvicorn', 'pandas', 'numpy', 'scikit-learn', 'pydantic', 'python-jose', 'passlib', 'python-dotenv'])\"",
+  "python -m uvicorn main:app --host 0.0.0.0 --port $PORT"
+]
