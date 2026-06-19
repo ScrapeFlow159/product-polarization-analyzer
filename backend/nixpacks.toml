@@ -3,8 +3,10 @@ nixPkgs = ["python312"]
 
 [phases.install]
 cmds = [
-  "pip install --no-cache-dir -r requirements.txt",
-  "pip install uvicorn"
+  "pip install uvicorn",
+  "pip install fastapi",
+  "pip install pandas numpy scikit-learn",
+  "pip install pydantic python-jose[cryptography] passlib[bcrypt] python-dotenv"
 ]
 
 [phases.start]
