@@ -2,7 +2,7 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "pip install --no-cache-dir uvicorn fastapi pandas numpy scikit-learn pydantic python-jose[cryptography] passlib[bcrypt] python-dotenv"
+    "buildCommand": "pip install -r requirements.txt"
   },
   "deploy": {
     "startCommand": "python -m uvicorn main:app --host 0.0.0.0 --port $PORT"
