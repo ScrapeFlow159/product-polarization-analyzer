@@ -1,9 +1,0 @@
-[phases.setup]
-nixPkgs = ["python312"]
-
-[phases.start]
-cmds = [
-  "python -c \"import subprocess, sys; subprocess.check_call([sys.executable, '-m', 'ensurepip'])\"",
-  "python -c \"import subprocess; subprocess.check_call(['python', '-m', 'pip', 'install', '--break-system-packages', 'fastapi', 'uvicorn', 'pandas', 'numpy', 'scikit-learn', 'pydantic', 'python-jose', 'passlib', 'python-dotenv'])\"",
-  "python -m uvicorn main:app --host 0.0.0.0 --port $PORT"
-]
