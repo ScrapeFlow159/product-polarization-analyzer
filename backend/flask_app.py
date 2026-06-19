@@ -253,21 +253,6 @@ def admin_delete_user(user_id):
     # ... existing code ...
     pass
 
-
-@app.route('/index.html')
-def serve_index():
-    """Serve frontend index.html from Flask"""
-    import os
-    from flask import send_from_directory
-    
-    # Frontend path (single_platform/frontend)
-    frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
-    index_path = os.path.join(frontend_path, "index.html")
-    
-    if os.path.exists(index_path):
-        return send_from_directory(frontend_path, "index.html")
-    else:
-        return "index.html not found", 404
 # ... add other admin routes ...
 
 if __name__ == "__main__":
