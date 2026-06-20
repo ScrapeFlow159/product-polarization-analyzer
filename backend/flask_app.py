@@ -31,7 +31,7 @@ def create_jwt_token(username, role):
 app = Flask(__name__)
 
 # Configured to allow Vercel origins to transmit Cross-Origin payloads cleanly
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, origins=["https://product-polarization-analyzer.vercel.app"])
 SENDER_EMAIL = "arobaarif271@gmail.com"
 
 def ensure_role_column():
