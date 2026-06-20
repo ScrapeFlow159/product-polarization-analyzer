@@ -67,21 +67,31 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 def send_email(to_email, otp):
-    subject = "Your OTP for Login"
-    body = f"Your OTP is: {otp}"
-    msg = MIMEText(body)
-    msg['Subject'] = subject
-    msg['From'] = SENDER_EMAIL
-    msg['To'] = to_email
+    import requests
+    import os
+    
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = {
+        "api-key": os.getenv("BREVO_API_KEY"),
+        "Content-Type": "application/json"
+    }
+    data = {
+        "sender": {"email": SENDER_EMAIL},
+        "to": [{"email": to_email}],
+        "subject": "Your OTP for Login",
+        "htmlContent": f"<p>Your OTP is: <strong>{otp}</strong></p>"
+    }
     try:
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=15)
-        server.login(SENDER_EMAIL, APP_PASSWORD)
-        server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
-        server.quit()
-        print("✅ Email sent")
+        response = requests.post(url, json=data, headers=headers)
+        if response.status_code == 201:
+            print("✅ Email sent via Brevo")
+            return True
+        else:
+            print(f"❌ Brevo error: {response.text}")
+            return False
     except Exception as e:
-        print("❌ EMAIL ERROR:", str(e))
-
+        print(f"❌ Email error: {e}")
+        return False
 login_attempts = {}
 
 # ================= FIXED ROUTES =================
