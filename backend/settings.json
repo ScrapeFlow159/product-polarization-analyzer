@@ -1,0 +1,9 @@
+{
+    "apify_api_key": "",
+    "scrape_schedule": "daily",
+    "scrape_time": "02:00",
+    "max_products_per_category": 100,
+    "default_k_value": 3,
+    "enable_weekly_scheduler": true,
+    "last_updated": "2026-05-16 16:04:18"
+}
