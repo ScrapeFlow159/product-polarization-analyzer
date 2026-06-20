@@ -1956,13 +1956,13 @@ function initCustomAnalysis() {
             });
         }
 
-  async function runAnalysis(page) {
+ async function runAnalysis(page) {
     const state = getState(page);
     if (state.selected.length === 0) return;
     
     // ✅ Disable button to prevent multiple clicks
     const analyzeBtn = document.getElementById(`${page}AnalyzeBtn`);
-    if (analyzeBtn && analyzeBtn.disabled) return; // Already running
+    if (analyzeBtn && analyzeBtn.disabled) return; 
     if (analyzeBtn) analyzeBtn.disabled = true;
     
     try {
@@ -1975,61 +1975,60 @@ function initCustomAnalysis() {
         if (page === 'weekly') analysisType = 'weekly';
         if (page === 'monthly') analysisType = 'monthly';
         
-        // ✨ FIXED: Convert platform to the exact string format backend requires
-        let backendPlatform = 'Daraz.pk';
-        if (state.platform === 'etsy') {
-            backendPlatform = 'Etsy.com';
-        }
+        // Exact Platform Name casing backend expects
+        const backendPlatform = state.platform === 'daraz' ? 'Daraz.pk' : 'Etsy.com';
         
+        // URL se exact credentials nikalen taaki sequence strictly match kare
+        const activeParams = new URLSearchParams(window.location.search);
+        const activeUsername = activeParams.get('username') || localStorage.getItem('username') || 'Guest';
+        const activeRole = activeParams.get('role') || localStorage.getItem('role') || 'Role';
+        const activeToken = activeParams.get('token') || localStorage.getItem('token') || localStorage.getItem('jwt_token');
+
         // Fetch analysis for each category
         for (let i = 0; i < state.selected.length; i++) {
             const category = state.selected[i];
-            console.log(`📡 Analyzing ${page} - ${backendPlatform} - ${category}`);
+            console.log(`📡 Requesting Pipeline for: ${backendPlatform} - ${category}`);
             
-            // ✅ Add username and role to URL safely
-           const currentUsername = localStorage.getItem('username') || username;
-const currentRole = localStorage.getItem('role') || role;
-const currentToken = localStorage.getItem('token') || token;
-
-const url = `${API_BASE_URL}/api/analyze?username=${encodeURIComponent(currentUsername)}&role=${encodeURIComponent(currentRole)}`;
+            // ✅ Sequence validation URL string matching backend requirement perfectly
+            const url = `${API_BASE_URL}/api/analyze?username=${encodeURIComponent(activeUsername)}&role=${encodeURIComponent(activeRole)}`;
 
             const response = await fetch(url, {
-    method: 'POST',
-    headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${currentToken}` // 👈 Isko currentToken kar dein
-    },
-    body: JSON.stringify({
-        platform: backendPlatform,
-        category: category,
-        subcategory: category,
-        max_products: 50,
-        analysis_type: analysisType,
-        save_to_db: true
-    })
-});
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${activeToken}`
+                },
+                body: JSON.stringify({
+                    platform: backendPlatform,
+                    category: category,
+                    subcategory: category,
+                    max_products: 50,
+                    analysis_type: analysisType,
+                    save_to_db: true
+                })
+            });
             
             if (response.ok) {
                 const data = await response.json();
                 state.results[category] = data;
             } else {
                 const errorData = await response.json().catch(() => ({}));
-                console.error("❌ Backend API responded with error:", errorData);
-                throw new Error(errorData.detail || `Server responded with status ${response.status}`);
+                console.error("Sequence Mismatch Payload:", errorData);
+                throw new Error(errorData.detail || `Server validation failed: ${response.status}`);
             }
         }
         
-        // Fetch comparison data for difference display
+        // Fetch comparison data 
         for (let i = 0; i < state.selected.length; i++) {
             const category = state.selected[i];
             try {
-                let backendPlatform = state.platform === 'daraz' ? 'Daraz.pk' : 'Etsy.com';
-                
-                // ✨ FIXED: Added 'Authorization' token to Comparison headers too
-                const compResponse = await fetch(`${API_BASE_URL}/api/comparison/${backendPlatform}/${category}`, {
+                const targetPlatform = state.platform === 'daraz' ? 'Daraz.pk' : 'Etsy.com';
+                const activeToken = localStorage.getItem('token') || token;
+
+                const compResponse = await fetch(`${API_BASE_URL}/api/comparison/${targetPlatform}/${category}`, {
                     method: 'GET',
                     headers: {
-                        'Authorization': `Bearer ${token}`,
+                        'Authorization': `Bearer ${activeToken}`,
                         'Content-Type': 'application/json'
                     }
                 });
@@ -2040,7 +2039,7 @@ const url = `${API_BASE_URL}/api/analyze?username=${encodeURIComponent(currentUs
                     else monthlyComparisonData[category] = compData;
                 }
             } catch(e) { 
-                console.error("Comparison data sync failed:", e); 
+                console.error("Comparison step bypassed:", e); 
             }
         }
         
@@ -2052,11 +2051,9 @@ const url = `${API_BASE_URL}/api/analyze?username=${encodeURIComponent(currentUs
         alert(`❌ Error: ${error.message}`);
     } finally {
         setLoading(page, false);
-        // ✅ Re-enable button after completion
         if (analyzeBtn) analyzeBtn.disabled = false;
     }
 }
-  // Weekly page custom week analysis
 async function analyzeWeeklyCustomWeek() {
     const platform = document.getElementById('weeklyPlatformSelect').value;
     
