@@ -1,5 +1,6 @@
 # flask_app.py - Complete Flask app (2FA)
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask_cors import CORS
 import sqlite3
 import hashlib
 import random
@@ -26,6 +27,8 @@ def create_jwt_token(username, role):
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 app = Flask(__name__)
+# Enable CORS so your Vercel frontend can safely speak to this Railway backend
+CORS(app, supports_credentials=True)
 app.secret_key = "secretkey123"
 
 SENDER_EMAIL = "arobaarif271@gmail.com"
@@ -81,25 +84,17 @@ def send_email(to_email, otp):
 
 login_attempts = {}
 
-# ================= ROUTES =================
+# ================= FIXED ROUTES =================
 
 @app.route('/')
 def home():
+    # FIXED: Instead of serving a broken index page, route users straight to the registration template or view
     return redirect(url_for('register'))
 
 @app.route('/index.html')
 def serve_index():
-    """Serve frontend index.html from Flask"""
-    import os
-    from flask import send_from_directory
-    
-    frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
-    index_path = os.path.join(frontend_path, "index.html")
-    
-    if os.path.exists(index_path):
-        return send_from_directory(frontend_path, "index.html")
-    else:
-        return "index.html not found", 404
+    # FIXED: Route index fallback traffic directly to registration as well
+    return redirect(url_for('register'))
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -232,7 +227,8 @@ def dashboard():
     role = session.get('role')
     jwt_token = session.get('jwt_token', '')
     if not username:
-        return redirect(url_for('login'))
+        # FIXED: Protection logic. If someone isn't logged in, don't let them see the dashboard!
+        return redirect(url_for('register'))
     return render_template('dashboard.html', username=username, role=role, jwt_token=jwt_token)
 
 @app.route('/logout')
@@ -241,18 +237,32 @@ def logout():
     flash("Logged out successfully!", "success")
     return redirect(url_for('login'))
 
-# Admin routes (keep as is)
+# Admin routes
 @app.route('/admin/manage-users')
 def admin_manage_users():
-    # ... existing code ...
-    pass
+    username = session.get('username')
+    role = session.get('role')
+    if role != 'Admin':
+        return redirect(url_for('dashboard'))
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, username, email, role FROM users")
+    users = cursor.fetchall()
+    conn.close()
+    return render_template('admin_users.html', users=users, username=username)
 
 @app.route('/admin/delete-user/<int:user_id>')
 def admin_delete_user(user_id):
-    # ... existing code ...
-    pass
-
-# ... add other admin routes ...
+    role = session.get('role')
+    if role != 'Admin':
+        return redirect(url_for('dashboard'))
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+    flash("User deleted successfully!", "success")
+    return redirect(url_for('admin_manage_users'))
 
 if __name__ == "__main__":
     ensure_role_column()
