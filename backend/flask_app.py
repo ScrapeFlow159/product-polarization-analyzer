@@ -1,4 +1,5 @@
-# flask_app.py - Complete Clean Stateless API
+# flask_app.py - 
+# omplete Clean Stateless API
 from flask import Flask, request, jsonify, redirect, url_for
 from flask_cors import CORS
 import sqlite3
@@ -12,7 +13,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-key-change-this-in-production")
+SECRET_KEY = "secretkey123secretkey123secretkey123"
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 
 # In-memory storage dictionary to track temporary OTP records safely without relying on broken browser session cookies
