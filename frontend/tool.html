@@ -1962,8 +1962,8 @@ function initCustomAnalysis() {
     
     // ✅ Disable button to prevent multiple clicks
     const analyzeBtn = document.getElementById(`${page}AnalyzeBtn`);
-    if (analyzeBtn.disabled) return; // Already running
-    analyzeBtn.disabled = true;
+    if (analyzeBtn && analyzeBtn.disabled) return; // Already running
+    if (analyzeBtn) analyzeBtn.disabled = true;
     
     try {
         setLoading(page, true);
@@ -1975,18 +1975,21 @@ function initCustomAnalysis() {
         if (page === 'weekly') analysisType = 'weekly';
         if (page === 'monthly') analysisType = 'monthly';
         
-        // Fix Platform String Matching Requirement
-        const platformPayloadName = state.platform === 'daraz' ? 'Daraz.pk' : 'Etsy.com';
+        // ✨ FIXED: Convert platform to the exact string format backend requires
+        let backendPlatform = 'Daraz.pk';
+        if (state.platform === 'etsy') {
+            backendPlatform = 'Etsy.com';
+        }
         
         // Fetch analysis for each category
         for (let i = 0; i < state.selected.length; i++) {
             const category = state.selected[i];
-            console.log(`📡 Analyzing ${page} - ${platformPayloadName} - ${category}`);
+            console.log(`📡 Analyzing ${page} - ${backendPlatform} - ${category}`);
             
-            // ✅ Add username and role to URL
+            // ✅ Add username and role to URL safely
             const url = `${API_BASE_URL}/api/analyze?username=${encodeURIComponent(username)}&role=${encodeURIComponent(role)}`;
 
-            // ✅ 1. FIXED: Added Authorization Header here
+            // ✨ FIXED: Added 'Authorization' token to the header
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 
@@ -1994,7 +1997,7 @@ function initCustomAnalysis() {
                     'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    platform: platformPayloadName,
+                    platform: backendPlatform, // Sent correctly as 'Daraz.pk' or 'Etsy.com'
                     category: category,
                     subcategory: category,
                     max_products: 50,
@@ -2008,7 +2011,8 @@ function initCustomAnalysis() {
                 state.results[category] = data;
             } else {
                 const errorData = await response.json().catch(() => ({}));
-                console.error("Analysis API failed details:", errorData);
+                console.error("❌ Backend API responded with error:", errorData);
+                throw new Error(errorData.detail || `Server responded with status ${response.status}`);
             }
         }
         
@@ -2016,18 +2020,16 @@ function initCustomAnalysis() {
         for (let i = 0; i < state.selected.length; i++) {
             const category = state.selected[i];
             try {
-                // Fix Platform String Matching for comparison too
-                const targetPlatform = state.platform === 'daraz' ? 'Daraz.pk' : 'Etsy.com';
+                let backendPlatform = state.platform === 'daraz' ? 'Daraz.pk' : 'Etsy.com';
                 
-                // ✅ 2. FIXED: Added secure headers to Comparison fetch loop
-                const compResponse = await fetch(`${API_BASE_URL}/api/comparison/${targetPlatform}/${category}`, {
+                // ✨ FIXED: Added 'Authorization' token to Comparison headers too
+                const compResponse = await fetch(`${API_BASE_URL}/api/comparison/${backendPlatform}/${category}`, {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     }
                 });
-                
                 if (compResponse.ok) {
                     const compData = await compResponse.json();
                     if (page === 'current') currentComparisonData[category] = compData;
@@ -2035,7 +2037,7 @@ function initCustomAnalysis() {
                     else monthlyComparisonData[category] = compData;
                 }
             } catch(e) { 
-                console.error("Comparison sync error caught:", e); 
+                console.error("Comparison data sync failed:", e); 
             }
         }
         
@@ -2051,7 +2053,7 @@ function initCustomAnalysis() {
         if (analyzeBtn) analyzeBtn.disabled = false;
     }
 }
-        // Weekly page custom week analysis
+  // Weekly page custom week analysis
 async function analyzeWeeklyCustomWeek() {
     const platform = document.getElementById('weeklyPlatformSelect').value;
     
