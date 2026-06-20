@@ -40,12 +40,17 @@ import csv
 from io import StringIO
 from fastapi.responses import StreamingResponse
 
+origins = [
+    "https://product-polarization-analyzer.vercel.app",
+    "http://localhost:3000",  # Agar local testing karni ho
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # ← ALLOW ALL (testing ke liye)
+    allow_origins=origins,  # Ya testing ke liye ["*"] rakh sakte hain
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
 )
 
 # ✅ Manual CORS Middleware (OPTIONS handle)
@@ -261,20 +266,6 @@ def test():
 
 # ✅ THEN mount Flask app
 app.mount("/auth", WSGIMiddleware(flask_app))
-
-@app.middleware("http")
-async def catch_all_options(request: Request, call_next):
-    if request.method == "OPTIONS":
-        response = Response(status_code=200)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, PUT, DELETE, PATCH"
-        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Origin, X-Requested-With"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        return response
-    response = await call_next(request)
-    return response
-
- 
 
 
 
