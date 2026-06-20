@@ -98,12 +98,12 @@ login_attempts = {}
 @app.route('/')
 def home():
     # FIXED: Instead of serving a broken index page, route users straight to the registration template or view
-    return redirect(url_for('register'))
+    return redirect(url_for('api_register'))
 
 @app.route('/index.html')
 def serve_index():
     # FIXED: Route index fallback traffic directly to registration as well
-    return redirect(url_for('register'))
+    return redirect(url_for('api_register'))
 
 @app.route('/api/register', methods=['POST'])
 def api_register():
