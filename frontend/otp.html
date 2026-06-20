@@ -43,12 +43,16 @@ document.getElementById('otpForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const otp = document.querySelector('[name="otp"]').value;
+    const username = localStorage.getItem('username'); // Gets the logged-in username safely
     
     try {
         const response = await fetch('https://product-polarization-analyzer-production.up.railway.app/verify_otp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ otp: otp })
+            body: JSON.stringify({ 
+                otp: otp,
+                username: username // FIXED: Sent together so backend doesn't throw 400
+            })
         });
         
         const data = await response.json();
@@ -67,7 +71,6 @@ document.getElementById('otpForm').addEventListener('submit', async (e) => {
     }
 });
 
-// Clean, fail-safe resend workflow that guides user without breaking backend state
 document.getElementById('resendBtn').addEventListener('click', () => {
     alert('ℹ️ To refresh your verification token securely, please run a quick login re-auth.');
     window.location.href = '/login.html';
