@@ -6,7 +6,6 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
     <style>
         body { background: linear-gradient(135deg, #667eea, #764ba2); height: 100vh; }
-        .card { border-radius: 15px; }
     </style>
 </head>
 <body class="d-flex justify-content-center align-items-center">
@@ -21,38 +20,22 @@
             <input type="text" name="otp" class="form-control text-center fs-4" placeholder="Enter 6-digit OTP" required>
         </div>
 
-        <button type="submit" class="btn btn-danger w-100 mb-3">
+        <button type="submit" class="btn btn-danger w-100">
             <i class="fa-solid fa-check-circle"></i> Verify
         </button>
     </form>
-
-    <hr>
-
-    <!-- Resend Section -->
-    <div class="mt-2">
-        <p class="small text-muted mb-1">Didn't receive the code?</p>
-        <button id="resendBtn" class="btn btn-link btn-sm text-decoration-none" type="button">
-            <i class="fa-solid fa-rotate-right"></i> Resend OTP
-        </button>
-        <div id="timerText" class="small text-secondary mt-1" style="display: none;">
-            Resend available in <span id="countdown">60</span>s
-        </div>
-    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-const BACKEND_URL = 'https://product-polarization-analyzer-production.up.railway.app';
-
-// --- Handle OTP Verification ---
 document.getElementById('otpForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const otp = document.querySelector('[name="otp"]').value;
     
     try {
-        const response = await fetch(`${BACKEND_URL}/api/verify-otp`, {
+        const response = await fetch('https://product-polarization-analyzer-production.up.railway.app/api/verify-otp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ otp: otp })
@@ -73,66 +56,6 @@ document.getElementById('otpForm').addEventListener('submit', async (e) => {
         alert('❌ Network error: ' + error.message);
     }
 });
-
-// --- Handle Resend OTP Logic ---
-document.getElementById('resendBtn').addEventListener('click', async () => {
-    const username = localStorage.getItem('username');
-    
-    if (!username) {
-        alert('❌ Session error: Username missing. Please try logging in again.');
-        window.location.href = '/login.html';
-        return;
-    }
-
-    try {
-        // We call your /api/login endpoint to generate and mail a fresh OTP sequence
-        const response = await fetch(`${BACKEND_URL}/api/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: username, password: "" }) // Your backend reads user details dynamically from the DB using username
-        });
-
-        const data = await response.json();
-
-        // Note: Your original login code throws a 400 if password is completely empty. 
-        // If your login logic requires the true password, this triggers a defensive fail. 
-        // A direct success block response triggers below:
-        if (response.ok || data.status === 'success') {
-            alert('📩 A fresh OTP has been dispatched to your email address.');
-            startCooldownTimer();
-        } else {
-            // If backend rejects empty pass, fallback cleanly:
-            alert('ℹ️ To security-refresh your code, please run a quick login re-auth.');
-            window.location.href = '/login.html';
-        }
-    } catch (error) {
-        alert('❌ Failed to request new OTP: ' + error.message);
-    }
-});
-
-// --- Cooldown Timer UI Logic ---
-function startCooldownTimer() {
-    const resendBtn = document.getElementById('resendBtn');
-    const timerText = document.getElementById('timerText');
-    const countdownEl = document.getElementById('countdown');
-    
-    resendBtn.disabled = true;
-    timerText.style.display = 'block';
-    
-    let timeLeft = 60;
-    countdownEl.textContent = timeLeft;
-    
-    const interval = setInterval(() => {
-        timeLeft--;
-        countdownEl.textContent = timeLeft;
-        
-        if (timeLeft <= 0) {
-            clearInterval(interval);
-            resendBtn.disabled = false;
-            timerText.style.display = 'none';
-        }
-    }, 1000);
-}
 </script>
 </body>
 </html>
