@@ -1987,24 +1987,27 @@ function initCustomAnalysis() {
             console.log(`📡 Analyzing ${page} - ${backendPlatform} - ${category}`);
             
             // ✅ Add username and role to URL safely
-            const url = `${API_BASE_URL}/api/analyze?username=${encodeURIComponent(username)}&role=${encodeURIComponent(role)}`;
+           const currentUsername = localStorage.getItem('username') || username;
+const currentRole = localStorage.getItem('role') || role;
+const currentToken = localStorage.getItem('token') || token;
 
-            // ✨ FIXED: Added 'Authorization' token to the header
+const url = `${API_BASE_URL}/api/analyze?username=${encodeURIComponent(currentUsername)}&role=${encodeURIComponent(currentRole)}`;
+
             const response = await fetch(url, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    platform: backendPlatform, // Sent correctly as 'Daraz.pk' or 'Etsy.com'
-                    category: category,
-                    subcategory: category,
-                    max_products: 50,
-                    analysis_type: analysisType,
-                    save_to_db: true
-                })
-            });
+    method: 'POST',
+    headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${currentToken}` // 👈 Isko currentToken kar dein
+    },
+    body: JSON.stringify({
+        platform: backendPlatform,
+        category: category,
+        subcategory: category,
+        max_products: 50,
+        analysis_type: analysisType,
+        save_to_db: true
+    })
+});
             
             if (response.ok) {
                 const data = await response.json();
