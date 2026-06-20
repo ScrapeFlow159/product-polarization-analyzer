@@ -74,17 +74,14 @@ def send_email(to_email, otp):
     msg['From'] = SENDER_EMAIL
     msg['To'] = to_email
     try:
-        # ✅ Use TLS instead of SSL (port 587)
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()  # ← Enable TLS
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=15)
         server.login(SENDER_EMAIL, APP_PASSWORD)
         server.sendmail(SENDER_EMAIL, to_email, msg.as_string())
         server.quit()
         print("✅ Email sent")
-        return True
     except Exception as e:
         print("❌ EMAIL ERROR:", str(e))
-        return False
+
 login_attempts = {}
 
 # ================= FIXED ROUTES =================
