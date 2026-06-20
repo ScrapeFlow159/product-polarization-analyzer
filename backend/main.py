@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Response, status
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import pandas as pd
@@ -197,11 +198,26 @@ def test():
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://product-polarization-analyzer.vercel.app", "*"],
+    allow_origins=["https://product-polarization-analyzer.vercel.app", "http://localhost:3000"], # Ya ["*"] agar sab allow karna hai
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Is se GET, POST, OPTIONS sab allow ho jayenge
+    allow_headers=["*"],  # Is se Authorization aur Content-Type sab allow ho jayenge
 )
+
+
+
+@app.middleware("http")
+async def cors_preflight_bypass(request, call_next):
+    # Agar request OPTIONS (Preflight) hai, toh foran 200 OK return karo
+    if request.method == "OPTIONS":
+        response = Response(status_code=status.HTTP_200_OK)
+        response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "https://product-polarization-analyzer.vercel.app")
+        response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS, DELETE, PUT"
+        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Origin"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        return response
+    
+    return await call_next(request)
 # Data models
 class Product(BaseModel):
     name: str
