@@ -262,6 +262,20 @@ def test():
 # ✅ THEN mount Flask app
 app.mount("/auth", WSGIMiddleware(flask_app))
 
+@app.middleware("http")
+async def catch_all_options(request: Request, call_next):
+    if request.method == "OPTIONS":
+        response = Response(status_code=200)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, PUT, DELETE, PATCH"
+        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Origin, X-Requested-With"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        return response
+    response = await call_next(request)
+    return response
+
+ 
+
 
 
 # Serve static files (frontend)
