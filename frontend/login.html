@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Register - 2FA System</title>
+    <title>Login - 2FA System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
     <style>
@@ -9,24 +9,19 @@
             background: linear-gradient(135deg, #667eea, #764ba2);
             height: 100vh;
         }
-        .card {
-            border-radius: 15px;
-        }
     </style>
 </head>
 <script>
-document.getElementById('registerForm').addEventListener('submit', async (e) => {
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const formData = {
         username: document.querySelector('[name="username"]').value,
-        email: document.querySelector('[name="email"]').value,
-        password: document.querySelector('[name="password"]').value,
-        role: document.querySelector('[name="role"]').value
+        password: document.querySelector('[name="password"]').value
     };
     
     try {
-        const response = await fetch('https://product-polarization-analyzer-production.up.railway.app/register', {
+        const response = await fetch('https://product-polarization-analyzer-production.up.railway.app/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(formData)
@@ -36,7 +31,8 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
         
         if (data.status === 'success') {
             alert('✅ ' + data.message);
-            window.location.href = '/login.html';
+            localStorage.setItem('username', formData.username);
+            window.location.href = '/otp.html';
         } else {
             alert('❌ ' + data.message);
         }
@@ -49,20 +45,15 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
 
 <div class="card shadow p-4" style="width: 400px;">
     <h3 class="text-center mb-4">
-        <i class="fa-solid fa-user-plus text-primary"></i> Register
+        <i class="fa-solid fa-right-to-bracket text-success"></i> Login
     </h3>
 
-    <!-- Cleaned up: Broken flash message code removed -->
+    <!-- Cleaned up: Broken flash message code removed completely -->
 
-    <form id="registerForm">
+    <form id="loginForm">
         <div class="mb-3">
             <label><i class="fa-solid fa-user"></i> Username</label>
             <input type="text" name="username" class="form-control" required>
-        </div>
-
-        <div class="mb-3">
-            <label><i class="fa-solid fa-envelope"></i> Email</label>
-            <input type="email" name="email" class="form-control" required>
         </div>
 
         <div class="mb-3">
@@ -70,24 +61,14 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
             <input type="password" name="password" class="form-control" required>
         </div>
 
-        <div class="mb-3">
-            <label><i class="fa-solid fa-user-tag"></i> Select Role</label>
-            <select name="role" class="form-control" required>
-                <option value="User">User</option>
-                <option value="Admin">Admin</option>
-                <option value="Research Analyst">Research Analyst</option>
-                <option value="Evaluator">Evaluator</option>
-            </select>
-        </div>
-
-        <button type="submit" class="btn btn-primary w-100">
-            <i class="fa-solid fa-user-check"></i> Create Account
+        <button type="submit" class="btn btn-success w-100">
+            <i class="fa-solid fa-paper-plane"></i> Send OTP
         </button>
     </form>
 
     <div class="text-center mt-3">
-        <!-- Fixed link to point to your new login page path -->
-        <a href="/login.html">Already have an account?</a>
+        <!-- Fixed link to point directly back to the register landing page -->
+        <a href="/index.html">Create new account</a>
     </div>
 </div>
 
