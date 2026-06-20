@@ -5,24 +5,60 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
     <style>
-        body {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            height: 100vh;
-        }
-        .card {
-            border-radius: 15px;
-        }
+        body { background: linear-gradient(135deg, #667eea, #764ba2); height: 100vh; }
+        .card { border-radius: 15px; }
     </style>
 </head>
+<body class="d-flex justify-content-center align-items-center">
+
+<div class="card shadow p-4" style="width: 400px;">
+    <h3 class="text-center mb-4">
+        <i class="fa-solid fa-user-plus text-primary"></i> Register
+    </h3>
+
+    <form id="registerForm">
+        <div class="mb-3">
+            <label><i class="fa-solid fa-user"></i> Username</label>
+            <input type="text" name="username" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label><i class="fa-solid fa-envelope"></i> Email</label>
+            <input type="email" name="email" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label><i class="fa-solid fa-lock"></i> Password</label>
+            <input type="password" name="password" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label><i class="fa-solid fa-user-tag"></i> Select Role</label>
+            <select name="role" class="form-control" required>
+                <option value="User">User</option>
+                <option value="Admin">Admin</option>
+                <option value="Research Analyst">Research Analyst</option>
+                <option value="Evaluator">Evaluator</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">
+            <i class="fa-solid fa-user-check"></i> Create Account
+        </button>
+    </form>
+
+    <div class="text-center mt-3">
+        <a href="/login.html">Already have an account?</a>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
 document.getElementById('registerForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const formData = {
-        username: document.querySelector('[name="username"]').value,
-        email: document.querySelector('[name="email"]').value,
-        password: document.querySelector('[name="password"]').value,
-        role: document.querySelector('[name="role"]').value
+        username: document.querySelector('[name=\"username\"]').value,
+        email: document.querySelector('[name=\"email\"]').value,
+        password: document.querySelector('[name=\"password\"]').value,
+        role: document.querySelector('[name=\"role\"]').value
     };
     
     try {
@@ -34,63 +70,16 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
         
         const data = await response.json();
         
-        if (data.status === 'success') {
-            alert('✅ ' + data.message);
-            window.location.href = '/login.html';
+        if (data.status === 'success' || response.ok) {
+            alert('✅ Registration Successful! Redirecting to login...');
+            window.location.href = '/login.html'; // Directs to login page
         } else {
-            alert('❌ ' + data.message);
+            alert('❌ ' + (data.message || 'Registration failed'));
         }
     } catch (error) {
         alert('❌ Network error: ' + error.message);
     }
 });
 </script>
-<body class="d-flex justify-content-center align-items-center">
-
-<div class="card shadow p-4" style="width: 400px;">
-    <h3 class="text-center mb-4">
-        <i class="fa-solid fa-user-plus text-primary"></i> Register
-    </h3>
-
-    <!-- Cleaned up: Broken flash message code removed -->
-
-    <form id="registerForm">
-        <div class="mb-3">
-            <label><i class="fa-solid fa-user"></i> Username</label>
-            <input type="text" name="username" class="form-control" required>
-        </div>
-
-        <div class="mb-3">
-            <label><i class="fa-solid fa-envelope"></i> Email</label>
-            <input type="email" name="email" class="form-control" required>
-        </div>
-
-        <div class="mb-3">
-            <label><i class="fa-solid fa-lock"></i> Password</label>
-            <input type="password" name="password" class="form-control" required>
-        </div>
-
-        <div class="mb-3">
-            <label><i class="fa-solid fa-user-tag"></i> Select Role</label>
-            <select name="role" class="form-control" required>
-                <option value="User">User</option>
-                <option value="Admin">Admin</option>
-                <option value="Research Analyst">Research Analyst</option>
-                <option value="Evaluator">Evaluator</option>
-            </select>
-        </div>
-
-        <button type="submit" class="btn btn-primary w-100">
-            <i class="fa-solid fa-user-check"></i> Create Account
-        </button>
-    </form>
-
-    <div class="text-center mt-3">
-        <!-- Fixed link to point to your new login page path -->
-        <a href="/login.html">Already have an account?</a>
-    </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
