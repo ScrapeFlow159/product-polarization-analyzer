@@ -112,7 +112,6 @@
 
         <div class="card-body p-4 text-center">
             
-            <!-- Main Tool Button -->
             <div class="mb-4">
                 <a id="launchBtn" href="#" target="_blank" class="btn-gradient btn-gradient-lg">
                     <i class="fas fa-chart-line fa-2x"></i><br>
@@ -123,38 +122,35 @@
 
             <hr>
 
-            <!-- Admin Section -->
             <div id="adminSection" style="display: none;">
                 <div class="alert alert-danger">
                     <i class="fas fa-shield-alt"></i> <strong>Admin Access:</strong> You have full system control
                 </div>
                 <div class="row mt-3">
                     <div class="col-md-4 mb-3">
-                        <a href="https://product-polarization-analyzer.up.railway.app/admin/manage-users" class="btn-gradient w-100">
+                        <a href="https://product-polarization-analyzer-production.up.railway.app/admin/manage-users" class="btn-gradient w-100">
                             <i class="fas fa-users"></i> Manage Users
                         </a>
                     </div>
                     <div class="col-md-4 mb-3">
-                        <a href="https://product-polarization-analyzer.up.railway.app/admin/system-settings" class="btn-gradient w-100">
+                        <a href="https://product-polarization-analyzer-production.up.railway.app/admin/system-settings" class="btn-gradient w-100">
                             <i class="fas fa-cogs"></i> System Settings
                         </a>
                     </div>
                     <div class="col-md-4 mb-3">
-                        <a href="https://product-polarization-analyzer.up.railway.app/admin/view-logs" class="btn-gradient w-100">
+                        <a href="https://product-polarization-analyzer-production.up.railway.app/admin/view-logs" class="btn-gradient w-100">
                             <i class="fas fa-history"></i> View Logs
                         </a>
                     </div>
                 </div>
             </div>
 
-            <!-- Research Analyst Section -->
             <div id="analystSection" style="display: none;">
                 <div class="alert alert-warning">
                     <i class="fas fa-flask"></i> <strong>Research Analyst Access:</strong> You can export data and adjust parameters
                 </div>
 
                 <div class="row mt-3">
-                    <!-- Export CSV Button -->
                     <div class="col-md-6 mb-3">
                         <div class="card h-100">
                             <div class="card-body text-center">
@@ -180,7 +176,6 @@
                         </div>
                     </div>
 
-                    <!-- Adjust Parameters Button -->
                     <div class="col-md-6 mb-3">
                         <div class="card h-100">
                             <div class="card-body text-center">
@@ -195,7 +190,6 @@
                     </div>
                 </div>
 
-                <!-- Parameters Modal -->
                 <div id="paramsModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999;">
                     <div style="position:relative; width:500px; margin:100px auto; background:white; border-radius:10px; padding:20px;">
                         <div class="modal-gradient-header">
@@ -240,7 +234,6 @@
                 </div>
             </div>
 
-            <!-- Evaluator Section -->
             <div id="evaluatorSection" style="display: none;">
                 <div class="alert alert-info">
                     <i class="fas fa-clipboard-list"></i> <strong>Evaluator Access:</strong> 
@@ -290,18 +283,18 @@
                                     <tbody>
                                         <tr>
                                             <td>Clustering Quality</td>
-                                            <td>Silhouette Score ≥ 0.50</td>
-                                            <td>Run analysis → Check meter below polarization score</td>
+                                            <td>Silhouette Score &ge; 0.50</td>
+                                            <td>Run analysis &rarr; Check meter below polarization score</td>
                                         </tr>
                                         <tr>
                                             <td>Polarization Score Range</td>
                                             <td>Between 0 and 1</td>
-                                            <td>Run analysis → Check gradient meter</td>
+                                            <td>Run analysis &rarr; Check gradient meter</td>
                                         </tr>
                                         <tr>
                                             <td>Response Time</td>
-                                            <td>≤ 3 seconds for ≤1000 products</td>
-                                            <td>Click analyze → observe loading time</td>
+                                            <td>&le; 3 seconds for &le;1000 products</td>
+                                            <td>Click analyze &rarr; observe loading time</td>
                                         </tr>
                                         <tr>
                                             <td>Top 10 Products</td>
@@ -326,7 +319,6 @@
                 </div>
             </div>
 
-            <!-- User Section (Default) -->
             <div id="userSection">
                 <div class="alert alert-secondary">
                     <i class="fas fa-user"></i> <strong>User Access:</strong> View-only access
@@ -353,7 +345,8 @@
 
 <script>
 // ===================== CONFIGURATION =====================
-const API_URL = 'https://product-polarization-analyzer-production.up.railway.app/register';
+// FIXED: Removed trailing paths so base routes render seamlessly
+const API_URL = 'https://product-polarization-analyzer-production.up.railway.app';
 const FRONTEND_URL = 'https://product-polarization-analyzer.vercel.app';
 
 // ===================== GET USER DATA =====================
@@ -371,7 +364,8 @@ document.getElementById('usernameDisplay').innerText = username;
 document.getElementById('roleDisplay').innerText = role;
 
 // ===================== SET LAUNCH BUTTON LINKS =====================
-const launchUrl = `${FRONTEND_URL}/index.html?token=${token}&username=${username}&role=${role}`;
+// FIXED: Changed /index.html to /tool.html so it doesn't loop back to register view
+const launchUrl = `${FRONTEND_URL}/tool.html?token=${token}&username=${username}&role=${role}`;
 document.getElementById('launchBtn').href = launchUrl;
 document.getElementById('evalLaunchBtn').href = launchUrl;
 
@@ -397,7 +391,8 @@ function logout() {
 async function exportCSV() {
     const category = document.getElementById('exportCategory').value;
     const analysisType = document.getElementById('exportType').value;
-    const url = `${API_URL}/api/export-results?platform=daraz&category=${category}&analysis_type=${analysisType}&username=${username}&role=${role}`;
+    // FIXED: Cleaned root API prefix path mapping
+    const url = `${API_URL}/export-results?platform=daraz&category=${category}&analysis_type=${analysisType}&username=${username}&role=${role}`;
     window.open(url, '_blank');
 }
 
@@ -405,10 +400,6 @@ async function exportCSV() {
 function openParamsModal() {
     document.getElementById('paramsModal').style.display = 'block';
     loadParameters();
-}
-
-function closeParamsModal() {
-    document.getElementById('paramsModal').style.display = 'none';
 }
 
 // Update weight display
@@ -425,6 +416,10 @@ document.getElementById('popularityWeight').oninput = function() {
     document.getElementById('popularityWeightVal').innerText = this.value;
 }
 
+function closeParamsModal() {
+    document.getElementById('paramsModal').style.display = 'none';
+}
+
 async function saveParameters() {
     const params = {
         k_value: parseInt(document.getElementById('kValue').value),
@@ -435,7 +430,8 @@ async function saveParameters() {
     };
     
     try {
-        const response = await fetch(`${API_URL}/api/set-params?username=${username}&role=${role}`, {
+        // FIXED: Cleaned root path endpoints
+        const response = await fetch(`${API_URL}/set-params?username=${username}&role=${role}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(params)
@@ -456,7 +452,8 @@ async function saveParameters() {
 
 async function loadParameters() {
     try {
-        const response = await fetch(`${API_URL}/api/get-params?username=${username}&role=${role}`);
+        // FIXED: Cleaned root path endpoints
+        const response = await fetch(`${API_URL}/get-params?username=${username}&role=${role}`);
         const params = await response.json();
         
         document.getElementById('kValue').value = params.k_value || 3;
