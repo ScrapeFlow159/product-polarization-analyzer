@@ -951,20 +951,26 @@
 // ==========================================
 const API_BASE_URL = 'https://product-polarization-analyzer-production.up.railway.app';
 
-// Token keys sync matching with otp.html
 const urlParams = new URLSearchParams(window.location.search);
 const token = urlParams.get('token') || localStorage.getItem('token') || localStorage.getItem('jwt_token');
 const username = urlParams.get('username') || localStorage.getItem('username') || 'Guest';
 const role = urlParams.get('role') || localStorage.getItem('role') || 'Role';
 
-// Update LocalStorage keys to keep everything clean
+// Storage clean synchronization
 if (urlParams.get('token')) localStorage.setItem('token', urlParams.get('token'));
 if (urlParams.get('username')) localStorage.setItem('username', urlParams.get('username'));
 if (urlParams.get('role')) localStorage.setItem('role', urlParams.get('role'));
 
-// Dynamic UI Info update
-document.getElementById('username').innerText = username;
-document.getElementById('userRole').innerText = role;
+// Safeguard validation fix (string "null" text handling)
+if (!token || token === "null" || token === undefined || token === "") {
+    console.error("Token verification failed inside current context tier.");
+} else {
+    localStorage.setItem('token', token);
+}
+
+// Dynamic UI Info update safely
+if(document.getElementById('username')) document.getElementById('username').innerText = username;
+if(document.getElementById('userRole')) document.getElementById('userRole').innerText = role;
 
 // Session Expiry Safeguard
 if (!token || token === "null") {
@@ -997,12 +1003,12 @@ async function analyzeCurrentPolarization(selectedCategories, platform) {
                 'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
-                platform: platform,
-                category: selectedCategories[0], // Sending the primary category context
-                unit: 'days',
-                duration: 7,
-                max_products: 50
-            })
+    platform: platform,
+    category: selectedCategories, // Pure array ko bhejein jo backend expect kar raha hai
+    unit: 'days',
+    duration: 7,
+    max_products: 50
+})
         });
 
         if (!response.ok) {
@@ -1105,9 +1111,15 @@ function showDailyProducts(category, date, dayNumber, score) {
     `;
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
-    fetch(`${API_BASE_URL}/api/daily-products/${platform}/${cleanCategory}/${date}`)
-        .then(res => res.json())
+
+fetch(`${API_BASE_URL}/api/daily-products/${platform}/${cleanCategory}/${date}`, {
+    method: 'GET',
+    headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+    }
+})
+.then(res => res.json())
         .then(data => {
             const content = document.getElementById('productsContent');
             if (data.products && data.products.length > 0) {
@@ -1944,7 +1956,7 @@ function initCustomAnalysis() {
             });
         }
 
-        async function runAnalysis(page) {
+  async function runAnalysis(page) {
     const state = getState(page);
     if (state.selected.length === 0) return;
     
@@ -1956,67 +1968,89 @@ function initCustomAnalysis() {
     try {
         setLoading(page, true);
         
-                updateStep(page, 1);
-                await simulateProcessing(page);
-                
-                let analysisType = 'current';
-                if (page === 'weekly') analysisType = 'weekly';
-                if (page === 'monthly') analysisType = 'monthly';
-                
-                // Fetch analysis for each category
-                for (let i = 0; i < state.selected.length; i++) {
-                    const category = state.selected[i];
-                    console.log(`📡 Analyzing ${page} - ${state.platform} - ${category}`);
-                    
-                    // ✅ Add username and role to URL
-const url = `${API_BASE_URL}/api/analyze?username=${username}&role=${role}`;
+        updateStep(page, 1);
+        await simulateProcessing(page);
+        
+        let analysisType = 'current';
+        if (page === 'weekly') analysisType = 'weekly';
+        if (page === 'monthly') analysisType = 'monthly';
+        
+        // Fix Platform String Matching Requirement
+        const platformPayloadName = state.platform === 'daraz' ? 'Daraz.pk' : 'Etsy.com';
+        
+        // Fetch analysis for each category
+        for (let i = 0; i < state.selected.length; i++) {
+            const category = state.selected[i];
+            console.log(`📡 Analyzing ${page} - ${platformPayloadName} - ${category}`);
+            
+            // ✅ Add username and role to URL
+            const url = `${API_BASE_URL}/api/analyze?username=${encodeURIComponent(username)}&role=${encodeURIComponent(role)}`;
 
-const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-        platform: state.platform,
-        category: category,
-        subcategory: category,
-        max_products: 50,
-        analysis_type: analysisType,
-        save_to_db: true
-    })
-});
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        state.results[category] = data;
+            // ✅ 1. FIXED: Added Authorization Header here
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    platform: platformPayloadName,
+                    category: category,
+                    subcategory: category,
+                    max_products: 50,
+                    analysis_type: analysisType,
+                    save_to_db: true
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                state.results[category] = data;
+            } else {
+                const errorData = await response.json().catch(() => ({}));
+                console.error("Analysis API failed details:", errorData);
+            }
+        }
+        
+        // Fetch comparison data for difference display
+        for (let i = 0; i < state.selected.length; i++) {
+            const category = state.selected[i];
+            try {
+                // Fix Platform String Matching for comparison too
+                const targetPlatform = state.platform === 'daraz' ? 'Daraz.pk' : 'Etsy.com';
+                
+                // ✅ 2. FIXED: Added secure headers to Comparison fetch loop
+                const compResponse = await fetch(`${API_BASE_URL}/api/comparison/${targetPlatform}/${category}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
                     }
+                });
+                
+                if (compResponse.ok) {
+                    const compData = await compResponse.json();
+                    if (page === 'current') currentComparisonData[category] = compData;
+                    else if (page === 'weekly') weeklyComparisonData[category] = compData;
+                    else monthlyComparisonData[category] = compData;
                 }
-                
-                // Fetch comparison data for difference display
-                for (let i = 0; i < state.selected.length; i++) {
-                    const category = state.selected[i];
-                    try {
-                        const compResponse = await fetch(`${API_BASE_URL}/api/comparison/${state.platform}/${category}`);
-                        if (compResponse.ok) {
-                            const compData = await compResponse.json();
-                            if (page === 'current') currentComparisonData[category] = compData;
-                            else if (page === 'weekly') weeklyComparisonData[category] = compData;
-                            else monthlyComparisonData[category] = compData;
-                        }
-                    } catch(e) { console.error(e); }
-                }
-                
-                setState(page, state);
-                displayResults(page);
-                
-            } catch (error) {
-                console.error('❌ Analysis failed:', error);
-                alert(`❌ Error: ${error.message}`);
-            } finally {
+            } catch(e) { 
+                console.error("Comparison sync error caught:", e); 
+            }
+        }
+        
+        setState(page, state);
+        displayResults(page);
+        
+    } catch (error) {
+        console.error('❌ Analysis failed:', error);
+        alert(`❌ Error: ${error.message}`);
+    } finally {
         setLoading(page, false);
         // ✅ Re-enable button after completion
-        analyzeBtn.disabled = false;
+        if (analyzeBtn) analyzeBtn.disabled = false;
     }
-        }
-
+}
         // Weekly page custom week analysis
 async function analyzeWeeklyCustomWeek() {
     const platform = document.getElementById('weeklyPlatformSelect').value;
