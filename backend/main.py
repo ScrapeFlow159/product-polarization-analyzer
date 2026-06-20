@@ -195,28 +195,33 @@ async def export_results(
 def test():
     return {"message": "working"}
 
-# CORS configuration
+# ========================================================
+# 🌟 CORSMiddleware & Preflight Control Engine (FINAL FIX)
+# ========================================================
+
+# 1. Standard CORS Layer Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://product-polarization-analyzer.vercel.app", "http://localhost:3000"], # Ya ["*"] agar sab allow karna hai
+    allow_origins=["https://product-polarization-analyzer.vercel.app", "http://localhost:3000"],
     allow_credentials=True,
-    allow_methods=["*"],  # Is se GET, POST, OPTIONS sab allow ho jayenge
-    allow_headers=["*"],  # Is se Authorization aur Content-Type sab allow ho jayenge
+    allow_methods=["GET", "POST", "OPTIONS", "PUT", "DELETE"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
 )
 
-
-
+# 2. Strong Global Interceptor (Bypasses preflight failures perfectly)
 @app.middleware("http")
 async def cors_preflight_bypass(request, call_next):
-    # Agar request OPTIONS (Preflight) hai, toh foran 200 OK return karo
     if request.method == "OPTIONS":
-        response = Response(status_code=status.HTTP_200_OK)
-        response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "https://product-polarization-analyzer.vercel.app")
-        response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS, DELETE, PUT"
-        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Origin"
+        response = Response(status_code=200)
+        origin_header = request.headers.get("origin", "https://product-polarization-analyzer.vercel.app")
+        
+        # Explicitly setting clean security string mappings
+        response.headers["Access-Control-Allow-Origin"] = origin_header
+        response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS, PUT, DELETE"
+        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Origin, X-Requested-With"
         response.headers["Access-Control-Allow-Credentials"] = "true"
         return response
-    
+        
     return await call_next(request)
 # Data models
 class Product(BaseModel):
