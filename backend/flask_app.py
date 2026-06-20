@@ -29,7 +29,7 @@ def create_jwt_token(username, role):
 app = Flask(__name__)
 # Enable CORS so your Vercel frontend can safely speak to this Railway backend
 CORS(app, supports_credentials=True)
-app.secret_key = "secretkey123"
+app.secret_key = os.getenv("SECRET_KEY", "secretkey123")
 
 SENDER_EMAIL = "arobaarif271@gmail.com"
 APP_PASSWORD = "ekrpepzprnyklzry"
