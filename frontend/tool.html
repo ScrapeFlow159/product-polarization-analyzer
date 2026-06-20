@@ -1402,11 +1402,16 @@ function closeModal() {
         let weeklyComparisonData = {};
         let monthlyComparisonData = {};
 
-        document.addEventListener("DOMContentLoaded", function() {
-    const userEl = document.getElementById('username');
-    const roleEl = document.getElementById('userRole');
-    if (userEl) userEl.innerText = urlParams.get('username') || "Haroon"; // UI screen par "Haroon" hi dikhega
-    if (roleEl) roleEl.innerText = role;
+        document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 App initialized');
+    checkBackend();
+    setupEventListeners();
+    initCustomAnalysis();
+    // ✅ Force initialize current page categories
+    const platformSelect = document.getElementById('currentPlatformSelect');
+    if (platformSelect && platformSelect.value) {
+        handlePlatformChange('current');
+    }
 });
 
         async function checkBackend() {
