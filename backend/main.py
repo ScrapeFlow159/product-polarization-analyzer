@@ -204,25 +204,26 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://product-polarization-analyzer.vercel.app", "http://localhost:3000"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS", "PUT", "DELETE"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
+    allow_methods=["*"],  # Yeh automatically OPTIONS ko pass karega
+    allow_headers=["*"],  # Yeh saare custom auth headers ko bypass karega
 )
 
-# 2. Strong Global Interceptor (Bypasses preflight failures perfectly)
+
 @app.middleware("http")
-async def cors_preflight_bypass(request, call_next):
+async def absolute_cors_lock(request: Request, call_next):
     if request.method == "OPTIONS":
         response = Response(status_code=200)
-        origin_header = request.headers.get("origin", "https://product-polarization-analyzer.vercel.app")
-        
-        # Explicitly setting clean security string mappings
-        response.headers["Access-Control-Allow-Origin"] = origin_header
-        response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS, PUT, DELETE"
+        response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "https://product-polarization-analyzer.vercel.app")
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, PUT, DELETE"
         response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Origin, X-Requested-With"
         response.headers["Access-Control-Allow-Credentials"] = "true"
         return response
-        
-    return await call_next(request)
+    
+    response = await call_next(request)
+    # Baaki normal requests ke saath bhi headers force karein taake browser reject na kare
+    response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "https://product-polarization-analyzer.vercel.app")
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
 # Data models
 class Product(BaseModel):
     name: str
