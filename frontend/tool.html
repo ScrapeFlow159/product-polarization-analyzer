@@ -1,0 +1,2571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Polarization Analyzer | Market Analytics</title>
+    <!-- Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        /* Header */
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1rem;
+        }
+        
+        /* Navigation Tabs */
+        .nav-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .nav-tab {
+            background: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: #666;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .nav-tab:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+        }
+        
+        .nav-tab.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+        
+        .nav-tab i {
+            margin-right: 8px;
+        }
+        
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #f0f0f0;
+            padding-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .card h2 i {
+            color: #667eea;
+        }
+        
+        /* Selection Section */
+        .selection-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .platform-row {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .platform-selector {
+            flex: 0 0 250px;
+        }
+        
+        .platform-selector label {
+            font-weight: 600;
+            color: #555;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+        
+        .form-control {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s;
+            width: 100%;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        /* Category Dropdown */
+        .category-dropdown {
+            position: relative;
+            width: 300px;
+        }
+        
+        .dropdown-btn {
+            width: 100%;
+            padding: 12px 15px;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+        
+        .dropdown-btn:hover {
+            border-color: #667eea;
+        }
+        
+        .dropdown-btn.active {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .dropdown-arrow {
+            transition: transform 0.3s;
+            font-size: 12px;
+        }
+        
+        .dropdown-arrow.open {
+            transform: rotate(180deg);
+        }
+        
+        .dropdown-content {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            margin-top: 5px;
+            max-height: 280px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        
+        .dropdown-content.show {
+            display: block;
+        }
+        
+        .dropdown-item {
+            padding: 12px 15px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .dropdown-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .dropdown-item.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #f5f5f5;
+        }
+        
+        .dropdown-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #667eea;
+        }
+        
+        .dropdown-item label {
+            cursor: pointer;
+            flex: 1;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        /* Selected Area */
+        .selected-section {
+            margin-top: 15px;
+            padding: 12px 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .selected-label {
+            font-size: 0.85rem;
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .selected-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            flex: 1;
+        }
+        
+        .selected-tag {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .selected-tag button {
+            background: rgba(255,255,255,0.3);
+            border: none;
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .counter {
+            font-size: 0.8rem;
+            color: #667eea;
+            font-weight: 500;
+        }
+        
+        .counter.warning {
+            color: #f59e0b;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 14px 30px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 20px;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        /* Loading */
+        .loading-container {
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .loading-spinner {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid #e0e0e0;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .processing-timer {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .processing-steps {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+            color: #666;
+            font-size: 0.9rem;
+            flex-wrap: wrap;
+        }
+        
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .step.active {
+            color: #667eea;
+            font-weight: bold;
+        }
+        
+        .step.completed {
+            color: #10b981;
+        }
+        
+        /* Difference Cards */
+        .difference-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        
+        .difference-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+        }
+        
+        .difference-card.weekly-diff {
+            border-top: 4px solid #48bb78;
+        }
+        
+        .difference-card.monthly-diff {
+            border-top: 4px solid #ecc94b;
+        }
+        
+        .difference-card h4 {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .difference-value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        
+        .difference-value.positive {
+            color: #10b981;
+        }
+        
+        .difference-value.negative {
+            color: #ef4444;
+        }
+        
+        .difference-value.neutral {
+            color: #f59e0b;
+        }
+        
+        .difference-label {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        /* Platform Badge */
+        .platform-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border-radius: 50px;
+            margin-bottom: 20px;
+        }
+        
+        .platform-badge.daraz {
+            border-left: 4px solid #ff6b00;
+        }
+        
+        .platform-badge.etsy {
+            border-left: 4px solid #f16521;
+        }
+        
+        /* Top Products Table */
+        .top-products-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .ranking-info {
+            background: #f0f4ff;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: #555;
+        }
+        
+        .ranking-info strong {
+            color: #667eea;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .product-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 900px;
+        }
+        
+        .product-table th {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #495057;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .product-table td {
+            padding: 15px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .product-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .rank-badge {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        
+        .score-highlight {
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        /* Polarization Score Section */
+        .polarization-container {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        
+        .polarization-label {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+        
+        .polarization-value {
+            font-size: 4rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .polarization-level {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+        }
+        
+        .meter-container {
+            max-width: 500px;
+            margin: 20px auto;
+        }
+        
+        .meter {
+            width: 100%;
+            height: 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .meter-fill {
+            height: 100%;
+            background: white;
+            border-radius: 10px;
+            transition: width 1s ease;
+        }
+        
+        .meter-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 5px;
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+        
+        /* Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .chart-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .chart-card h3 {
+            margin-bottom: 15px;
+            color: #495057;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        
+        /* Clusters Grid */
+        .clusters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .cluster-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 4px solid;
+            transition: transform 0.2s;
+        }
+        
+        .cluster-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .cluster-card.budget {
+            border-left-color: #48bb78;
+        }
+        
+        .cluster-card.mid-range {
+            border-left-color: #ecc94b;
+        }
+        
+        .cluster-card.premium {
+            border-left-color: #9f7aea;
+        }
+        
+        .cluster-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .cluster-name {
+            font-size: 1.2rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .cluster-size {
+            background: #e9ecef;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        .cluster-detail {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px dashed #e0e0e0;
+        }
+        
+        .cluster-detail:last-child {
+            border-bottom: none;
+        }
+        
+        /* Feature Importance */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .feature-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+        }
+        
+        .feature-name {
+            color: #666;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .feature-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .data-source-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .data-source-csv {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .cluster-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .badge-budget {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .badge-mid {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .badge-premium {
+            background: #e9d5ff;
+            color: #6b21a5;
+        }
+        
+        /* Page Content */
+        .page-content {
+            display: none;
+        }
+        
+        .page-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Results Tabs */
+        .results-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+        }
+        
+        .result-tab {
+            background: #f8f9fa;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            color: #666;
+        }
+        
+        .result-tab:hover {
+            background: #e9ecef;
+        }
+        
+        .result-tab.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @media (max-width: 992px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            .difference-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            .polarization-value {
+                font-size: 3rem;
+            }
+            .platform-row {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .category-dropdown {
+                width: 100%;
+            }
+            .nav-tab {
+                padding: 10px 20px;
+                font-size: 0.85rem;
+            }
+        }
+
+        /* Custom Selector Styles - ADD THIS */
+.custom-selector {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.custom-selector label {
+    font-weight: 600;
+    color: #555;
+    font-size: 0.9rem;
+}
+
+#weekDaysSelect, #monthWeeksSelect {
+    width: auto;
+    min-width: 180px;
+    padding: 10px 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    background: white;
+}
+
+.result-card {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 16px;
+    padding: 20px;
+    margin-top: 15px;
+}
+
+.result-card h3 {
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.result-card p {
+    margin: 8px 0;
+    color: #555;
+}
+
+.trend-chart {
+    margin-top: 15px;
+    height: 200px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    gap: 5px;
+}
+
+.trend-bar {
+    flex: 1;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 8px 8px 4px 4px;
+    transition: height 0.3s;
+}
+
+.trend-label {
+    text-align: center;
+    font-size: 0.7rem;
+    margin-top: 5px;
+    color: #666;
+}
+
+.trend-value {
+    text-align: center;
+    font-size: 0.7rem;
+    font-weight: bold;
+    margin-top: 3px;
+}
+/* Modal Styles */
+.modal {
+    animation: fadeIn 0.2s ease;
+}
+
+.modal .product-table {
+    font-size: 0.85rem;
+}
+
+.modal .product-table th,
+.modal .product-table td {
+    padding: 8px 12px;
+}
+
+/* Custom Week/Month Results - Full Width Fix */
+#weeklyCustomTabContents .tab-content.active,
+#monthlyCustomTabContents .tab-content.active {
+    display: block;
+    width: 100%;
+}
+
+#weeklyCustomTabContents .result-card,
+#monthlyCustomTabContents .result-card {
+    width: 100%;
+    margin: 0;
+    padding: 20px;
+}
+
+#weeklyCustomTabContents canvas,
+#monthlyCustomTabContents canvas {
+    width: 100% !important;
+    height: auto !important;
+    max-height: 280px;
+}
+
+/* Chart container full width */
+#weeklyCustomTabContents .chart-container,
+#monthlyCustomTabContents .chart-container {
+    width: 100%;
+    display: block;
+}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📊 Product Polarization Analyzer</h1>
+            <p class="subtitle">Multi-Category Analysis | Current | Weekly | Monthly Trends with Difference Comparison</p>
+        </div>
+
+        <script>
+            // Get token from URL and store in localStorage
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('token');
+            const username = urlParams.get('username');
+            const role = urlParams.get('role');
+            
+            console.log("🔍 Index page loaded");
+            console.log("Token from URL:", token);
+            
+            if (token && token !== "" && token !== "null") {
+                localStorage.setItem('jwt_token', token);
+                console.log("✅ JWT Token stored in localStorage from index.html");
+                console.log("📦 Token:", token.substring(0, 50) + "...");
+            } else {
+                console.log("❌ No token found in URL");
+            }
+            
+            if (username) localStorage.setItem('username', username);
+            if (role) localStorage.setItem('role', role);
+        </script>
+        <!-- User Info Bar -->
+<div class="user-info-bar" style="background: white; border-radius: 10px; padding: 10px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+    <div>
+        <i class="fas fa-user-circle"></i> 
+        Logged in as: <strong id="username">Guest</strong>
+        <span class="badge" id="userRole" style="margin-left: 10px;">Role</span>
+    </div>
+    <a href="/auth/logout" class="btn btn-sm btn-danger">
+        <i class="fas fa-sign-out-alt"></i> Logout
+    </a>
+</div>
+
+
+<script>
+// ========== DAILY PRODUCTS MODAL FUNCTIONS ==========
+
+function showDailyProducts(category, date, dayNumber, score) {
+    // Auto-detect platform from current page selection
+    let platform = 'Daraz.pk';
+    const currentPlatform = document.getElementById('currentPlatformSelect')?.value;
+    const weeklyPlatform = document.getElementById('weeklyPlatformSelect')?.value;
+    const monthlyPlatform = document.getElementById('monthlyPlatformSelect')?.value;
+    
+    if (currentPlatform === 'daraz') platform = 'Daraz.pk';
+    else if (currentPlatform === 'etsy') platform = 'Etsy.com';
+    else if (weeklyPlatform === 'daraz') platform = 'Daraz.pk';
+    else if (weeklyPlatform === 'etsy') platform = 'Etsy.com';
+    else if (monthlyPlatform === 'daraz') platform = 'Daraz.pk';
+    else if (monthlyPlatform === 'etsy') platform = 'Etsy.com';
+    
+    // Clean category name
+    let cleanCategory = category;
+    if (cleanCategory === 'daraz') cleanCategory = 'earpods';
+    if (cleanCategory === 'etsy') cleanCategory = 'art';
+    if (cleanCategory === 'Daraz.pk') cleanCategory = 'earpods';
+    if (cleanCategory === 'Etsy.com') cleanCategory = 'art';
+    
+    console.log(`🔍 Fetching: ${platform}/${cleanCategory}/${date}`);
+    
+    const modalHtml = `
+        <div id="productsModal" class="modal" style="display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+            <div style="background: white; border-radius: 15px; max-width: 800px; width: 90%; max-height: 80%; overflow: auto; padding: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3>Top Products for ${cleanCategory.toUpperCase()}</h3>
+                    <button onclick="closeModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <p><strong>Platform:</strong> ${platform}</p>
+                    <p><strong>Date:</strong> ${date}</p>
+                    <p><strong>Score:</strong> ${score.toFixed(4)}</p>
+                </div>
+                <div id="productsContent"><div class="loading-spinner"><div class="spinner"></div> Loading...</div></div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    fetch(`${API_BASE_URL}/api/daily-products/${platform}/${cleanCategory}/${date}`)
+        .then(res => res.json())
+        .then(data => {
+            const content = document.getElementById('productsContent');
+            if (data.products && data.products.length > 0) {
+                content.innerHTML = '<table class="product-table"><thead><tr><th>Rank</th><th>Product</th><th>Price</th><th>Rating</th></tr></thead><tbody>' +
+                    data.products.map((p, idx) => `<tr><td>${idx+1}</td><td>${p.name.substring(0, 50)}</td><td>${p.price}</td><td>${p.rating}⭐</td>`).join('') +
+                    '</tbody></table>';
+            } else {
+                content.innerHTML = '<p>No products available. Run analysis first.</p>';
+            }
+        })
+        .catch(err => {
+            console.error("Error:", err);
+            document.getElementById('productsContent').innerHTML = `<p>Error: ${err.message}</p>`;
+        });
+}
+function closeModal() {
+    const modal = document.getElementById('productsModal');
+    if (modal) modal.remove();
+}
+</script>
+
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="switchPage('current')">
+                <i class="fas fa-clock"></i> Current Analysis
+            </button>
+            <button class="nav-tab" onclick="switchPage('weekly')">
+                <i class="fas fa-calendar-week"></i> Weekly Analysis
+            </button>
+            <button class="nav-tab" onclick="switchPage('monthly')">
+                <i class="fas fa-calendar-alt"></i> Monthly Analysis
+            </button>
+        </div>
+
+        <!-- CURRENT PAGE -->
+        <div id="currentPage" class="page-content active">
+            <div class="card">
+                <h2><i>🔍</i> Current Analysis - Select Categories</h2>
+                
+                <div class="selection-controls">
+                    <div class="platform-row">
+                        <div class="platform-selector">
+                            <label><span>📱</span> Platform:</label>
+                            <select id="currentPlatformSelect" class="form-control">
+                                <option value="">-- Select Platform --</option>
+                                <option value="daraz">Daraz.pk (Pakistan)</option>
+                                <option value="etsy">Etsy.com (USA)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="category-dropdown" id="currentCategoryGroup" style="display: none;">
+                            <label><span>📂</span> Categories (Max 3):</label>
+                            <div class="dropdown-btn" id="currentDropdownBtn">
+                                <span id="currentDropdownText">Select categories</span>
+                                <span class="dropdown-arrow" id="currentDropdownArrow">▼</span>
+                            </div>
+                            <div class="dropdown-content" id="currentDropdownContent"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="selected-section" id="currentSelectedSection" style="display: none;">
+                        <span class="selected-label">📌 Selected:</span>
+                        <div class="selected-tags" id="currentSelectedTags"></div>
+                        <span class="counter" id="currentCounter">0/3 selected</span>
+                    </div>
+                    
+                    <button id="currentAnalyzeBtn" class="btn-primary" disabled>
+                        <span>🚀</span> Analyze Current Polarization
+                    </button>
+                </div>
+                
+                <div class="loading-container" id="currentLoadingContainer">
+                    <div class="loading-spinner">
+                        <div class="spinner"></div>
+                        <div>
+                            <div class="processing-timer" id="currentTimer">Processing... 3s</div>
+                            <div class="processing-steps">
+                                <span class="step" id="currentStep1">📊 Loading CSV Data</span>
+                                <span class="step" id="currentStep2">🧹 Cleaning & Normalizing</span>
+                                <span class="step" id="currentStep3">🤖 Applying K-Means</span>
+                                <span class="step" id="currentStep4">📈 Calculating Score</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="currentResults"></div>
+            <!-- Current Page main - currentResults div ke baad yeh add karo -->
+
+        </div>
+
+        <!-- WEEKLY PAGE -->
+        <div id="weeklyPage" class="page-content">
+            <div class="card">
+                <h2><i>📅</i> Weekly Analysis - Last Week's Data</h2>
+                
+                <div class="selection-controls">
+                    <div class="platform-row">
+                        <div class="platform-selector">
+                            <label><span>📱</span> Platform:</label>
+                            <select id="weeklyPlatformSelect" class="form-control">
+                                <option value="">-- Select Platform --</option>
+                                <option value="daraz">Daraz.pk (Pakistan)</option>
+                                <option value="etsy">Etsy.com (USA)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="category-dropdown" id="weeklyCategoryGroup" style="display: none;">
+                            <label><span>📂</span> Categories (Max 3):</label>
+                            <div class="dropdown-btn" id="weeklyDropdownBtn">
+                                <span id="weeklyDropdownText">Select categories</span>
+                                <span class="dropdown-arrow" id="weeklyDropdownArrow">▼</span>
+                            </div>
+                            <div class="dropdown-content" id="weeklyDropdownContent"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="selected-section" id="weeklySelectedSection" style="display: none;">
+                        <span class="selected-label">📌 Selected:</span>
+                        <div class="selected-tags" id="weeklySelectedTags"></div>
+                        <span class="counter" id="weeklyCounter">0/3 selected</span>
+                    </div>
+                    
+                    <button id="weeklyAnalyzeBtn" class="btn-primary" disabled>
+                        <span>🚀</span> Analyze Weekly Polarization
+                    </button>
+                </div>
+                
+                <div class="loading-container" id="weeklyLoadingContainer">
+                    <div class="loading-spinner">
+                        <div class="spinner"></div>
+                        <div>
+                            <div class="processing-timer" id="weeklyTimer">Processing... 3s</div>
+                            <div class="processing-steps">
+                                <span class="step" id="weeklyStep1">📊 Loading CSV Data</span>
+                                <span class="step" id="weeklyStep2">🧹 Cleaning & Normalizing</span>
+                                <span class="step" id="weeklyStep3">🤖 Applying K-Means</span>
+                                <span class="step" id="weeklyStep4">📈 Calculating Score</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="weeklyResults"></div>
+            <!-- Weekly Page Custom Week Card -->
+<div id="weeklyCustomCards" style="display: none;">
+    <div class="card">
+        <h2><i class="fas fa-calendar-week"></i> Custom Week Analysis</h2>
+        <div class="custom-selector">
+            <label>Select Days Range:</label>
+            <select id="weeklyWeekDaysSelect" class="form-control">
+                <option value="3">Last 3 Days</option>
+                <option value="5">Last 5 Days</option>
+                <option value="7" selected>Last 7 Days (1 Week)</option>
+                <option value="14">Last 14 Days (2 Weeks)</option>
+            </select>
+            <button id="weeklyCustomWeekBtn" class="btn-primary" style="margin-top: 0; padding: 10px 25px;">
+                <i class="fas fa-chart-line"></i> Analyze Custom Week
+            </button>
+        </div>
+        
+        <!-- ✅ TABS FOR CUSTOM RESULTS (YEH ADD KARO) -->
+        <div class="results-tabs" id="weeklyCustomTabs" style="margin-top: 20px; display: none;"></div>
+        
+        <!-- ✅ TAB CONTENT FOR CUSTOM RESULTS (YEH ADD KARO) -->
+        <div id="weeklyCustomTabContents" style="margin-top: 15px;"></div>
+    </div>
+</div>
+        </div>
+
+        <!-- MONTHLY PAGE -->
+        <div id="monthlyPage" class="page-content">
+            <div class="card">
+                <h2><i>📆</i> Monthly Analysis - Last Month's Data</h2>
+                
+                <div class="selection-controls">
+                    <div class="platform-row">
+                        <div class="platform-selector">
+                            <label><span>📱</span> Platform:</label>
+                            <select id="monthlyPlatformSelect" class="form-control">
+                                <option value="">-- Select Platform --</option>
+                                <option value="daraz">Daraz.pk (Pakistan)</option>
+                                <option value="etsy">Etsy.com (USA)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="category-dropdown" id="monthlyCategoryGroup" style="display: none;">
+                            <label><span>📂</span> Categories (Max 3):</label>
+                            <div class="dropdown-btn" id="monthlyDropdownBtn">
+                                <span id="monthlyDropdownText">Select categories</span>
+                                <span class="dropdown-arrow" id="monthlyDropdownArrow">▼</span>
+                            </div>
+                            <div class="dropdown-content" id="monthlyDropdownContent"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="selected-section" id="monthlySelectedSection" style="display: none;">
+                        <span class="selected-label">📌 Selected:</span>
+                        <div class="selected-tags" id="monthlySelectedTags"></div>
+                        <span class="counter" id="monthlyCounter">0/3 selected</span>
+                    </div>
+                    
+                    <button id="monthlyAnalyzeBtn" class="btn-primary" disabled>
+                        <span>🚀</span> Analyze Monthly Polarization
+                    </button>
+                </div>
+                
+                <div class="loading-container" id="monthlyLoadingContainer">
+                    <div class="loading-spinner">
+                        <div class="spinner"></div>
+                        <div>
+                            <div class="processing-timer" id="monthlyTimer">Processing... 3s</div>
+                            <div class="processing-steps">
+                                <span class="step" id="monthlyStep1">📊 Loading CSV Data</span>
+                                <span class="step" id="monthlyStep2">🧹 Cleaning & Normalizing</span>
+                                <span class="step" id="monthlyStep3">🤖 Applying K-Means</span>
+                                <span class="step" id="monthlyStep4">📈 Calculating Score</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="monthlyResults"></div>
+            <!-- Monthly Page Custom Month Card -->
+<div id="monthlyCustomCards" style="display: none;">
+    <div class="card">
+        <h2><i class="fas fa-calendar-alt"></i> Custom Month Analysis</h2>
+        <div class="custom-selector">
+            <label>Select Weeks Range:</label>
+            <select id="monthlyMonthWeeksSelect" class="form-control">
+                <option value="2">Last 2 Weeks</option>
+                <option value="3">Last 3 Weeks</option>
+                <option value="4" selected>Last 4 Weeks (1 Month)</option>
+                <option value="8">Last 8 Weeks (2 Months)</option>
+            </select>
+            <button id="monthlyCustomMonthBtn" class="btn-primary" style="margin-top: 0; padding: 10px 25px;">
+                <i class="fas fa-chart-line"></i> Analyze Custom Month
+            </button>
+        </div>
+        
+        <!-- ✅ TABS FOR CUSTOM RESULTS -->
+        <div class="results-tabs" id="monthlyCustomTabs" style="margin-top: 20px; display: none;"></div>
+        
+        <!-- ✅ TAB CONTENT FOR CUSTOM RESULTS -->
+        <div id="monthlyCustomTabContents" style="margin-top: 15px;"></div>
+    </div>
+</div>
+        </div>
+    </div>
+
+    <script>
+        // Railway backend URL (Vercel se alag)
+const API_BASE_URL = 'https://product-polarization-analyzer-production.up.railway.app/register';
+        
+        const AVAILABLE_CATEGORIES = {
+            daraz: ['Earpods', 'Powerbanks', 'Mobile phone accessories', 'Gaming accessories', 'Smart watches'],
+            etsy: ['Art', 'Handmade', 'Jewelry', 'Vintage', 'Accessories']
+        };
+
+        // State for each page
+        let currentState = { platform: '', selected: [], results: {}, charts: {} };
+        let weeklyState = { platform: '', selected: [], results: {}, charts: {} };
+        let monthlyState = { platform: '', selected: [], results: {}, charts: {} };
+        
+        let currentComparisonData = {};
+        let weeklyComparisonData = {};
+        let monthlyComparisonData = {};
+
+        document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 App initialized');
+    checkBackend();
+    setupEventListeners();
+    initCustomAnalysis();  // <-- YEH LINE ADD KARO
+});
+
+        async function checkBackend() {
+            try {
+                await fetch(`${API_BASE_URL}/`);
+                console.log('✅ Backend connected');
+            } catch (error) {
+                console.error('❌ Backend connection failed');
+                alert('⚠️ Cannot connect to backend. Please ensure server is running on port 8000');
+            }
+        }
+
+        function setupEventListeners() {
+            // Current page
+            setupPageEvents('current');
+            setupPageEvents('weekly');
+            setupPageEvents('monthly');
+        }
+
+        function setupPageEvents(page) {
+            const platformSelect = document.getElementById(`${page}PlatformSelect`);
+            const dropdownBtn = document.getElementById(`${page}DropdownBtn`);
+            const dropdownContent = document.getElementById(`${page}DropdownContent`);
+            const dropdownArrow = document.getElementById(`${page}DropdownArrow`);
+            const analyzeBtn = document.getElementById(`${page}AnalyzeBtn`);
+            
+            platformSelect.addEventListener('change', () => handlePlatformChange(page));
+            analyzeBtn.addEventListener('click', () => runAnalysis(page));
+            
+            dropdownBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleDropdown(page);
+            });
+            
+            document.addEventListener('click', () => closeDropdown(page));
+        }
+
+        function getState(page) {
+            if (page === 'current') return currentState;
+            if (page === 'weekly') return weeklyState;
+            return monthlyState;
+        }
+
+        function setState(page, newState) {
+            if (page === 'current') currentState = newState;
+            else if (page === 'weekly') weeklyState = newState;
+            else monthlyState = newState;
+        }
+
+        function handlePlatformChange(page) {
+            const platformSelect = document.getElementById(`${page}PlatformSelect`);
+            const state = getState(page);
+            
+            state.platform = platformSelect.value;
+            state.selected = [];
+            state.results = {};
+            
+            if (state.platform) {
+                document.getElementById(`${page}CategoryGroup`).style.display = 'block';
+                document.getElementById(`${page}SelectedSection`).style.display = 'flex';
+                populateCategories(page);
+                updateSelectionUI(page);
+                updateAnalyzeButton(page);
+                document.getElementById(`${page}Results`).innerHTML = '';
+                document.getElementById(`${page}DropdownText`).textContent = 'Select categories';
+            } else {
+                document.getElementById(`${page}CategoryGroup`).style.display = 'none';
+                document.getElementById(`${page}SelectedSection`).style.display = 'none';
+                document.getElementById(`${page}AnalyzeBtn`).disabled = true;
+            }
+        }
+
+        function populateCategories(page) {
+            const state = getState(page);
+            const categories = AVAILABLE_CATEGORIES[state.platform] || [];
+            const dropdownContent = document.getElementById(`${page}DropdownContent`);
+            
+            dropdownContent.innerHTML = '';
+            
+            categories.forEach(cat => {
+                const categoryId = cat.toLowerCase().replace(/ /g, '_');
+                const isSelected = state.selected.includes(categoryId);
+                const isDisabled = !isSelected && state.selected.length >= 3;
+                
+                const div = document.createElement('div');
+                div.className = `dropdown-item ${isDisabled ? 'disabled' : ''}`;
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `${page}_cat_${categoryId}`;
+                checkbox.checked = isSelected;
+                checkbox.disabled = isDisabled;
+                checkbox.onchange = (e) => {
+                    e.stopPropagation();
+                    handleCategoryToggle(page, categoryId, cat, checkbox.checked);
+                };
+                
+                const label = document.createElement('label');
+                label.htmlFor = `${page}_cat_${categoryId}`;
+                label.textContent = cat;
+                
+                div.appendChild(checkbox);
+                div.appendChild(label);
+                
+                div.onclick = (e) => {
+                    if (e.target !== checkbox && !isDisabled) {
+                        checkbox.checked = !checkbox.checked;
+                        handleCategoryToggle(page, categoryId, cat, checkbox.checked);
+                    } else if (isDisabled) {
+                        showMaxLimitWarning(page);
+                    }
+                };
+                
+                dropdownContent.appendChild(div);
+            });
+        }
+
+        function showMaxLimitWarning(page) {
+            const counter = document.getElementById(`${page}Counter`);
+            counter.classList.add('warning');
+            setTimeout(() => counter.classList.remove('warning'), 1500);
+        }
+
+        function handleCategoryToggle(page, categoryId, categoryName, isChecked) {
+            const state = getState(page);
+            
+            if (isChecked) {
+                if (state.selected.length >= 3) {
+                    showMaxLimitWarning(page);
+                    const checkbox = document.getElementById(`${page}_cat_${categoryId}`);
+                    if (checkbox) checkbox.checked = false;
+                    return;
+                }
+                if (!state.selected.includes(categoryId)) {
+                    state.selected.push(categoryId);
+                }
+            } else {
+                const index = state.selected.indexOf(categoryId);
+                if (index > -1) {
+                    state.selected.splice(index, 1);
+                    delete state.results[categoryId];
+                    if (state.charts[categoryId]) {
+                        Object.values(state.charts[categoryId]).forEach(chart => chart?.destroy());
+                        delete state.charts[categoryId];
+                    }
+                }
+            }
+            
+            setState(page, state);
+            updateSelectionUI(page);
+            updateAnalyzeButton(page);
+            document.getElementById(`${page}Results`).innerHTML = '';
+        }
+
+        function updateSelectionUI(page) {
+            const state = getState(page);
+            const count = state.selected.length;
+            const counter = document.getElementById(`${page}Counter`);
+            const dropdownText = document.getElementById(`${page}DropdownText`);
+            const selectedTags = document.getElementById(`${page}SelectedTags`);
+            
+            counter.textContent = `${count}/3 selected`;
+            
+            if (count === 0) {
+                dropdownText.textContent = 'Select categories';
+            } else if (count === 1) {
+                const name = state.selected[0].replace(/_/g, ' ');
+                dropdownText.textContent = name.split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+            } else {
+                dropdownText.textContent = `${count} categories selected`;
+            }
+            
+            const selectedNames = state.selected.map(catId => {
+                const cats = AVAILABLE_CATEGORIES[state.platform] || [];
+                return cats.find(c => c.toLowerCase().replace(/ /g, '_') === catId) || catId;
+            });
+            
+            selectedTags.innerHTML = selectedNames.map(name => `
+                <span class="selected-tag">
+                    ${name}
+                    <button onclick="removeCategory('${page}', '${name.toLowerCase().replace(/ /g, '_')}')">×</button>
+                </span>
+            `).join('');
+            
+            if (selectedNames.length === 0) {
+                selectedTags.innerHTML = '<span style="color: #999; font-size: 0.8rem;">No categories selected</span>';
+            }
+            
+            // Update dropdown items
+            const categories = AVAILABLE_CATEGORIES[state.platform] || [];
+            categories.forEach(cat => {
+                const categoryId = cat.toLowerCase().replace(/ /g, '_');
+                const checkbox = document.getElementById(`${page}_cat_${categoryId}`);
+                if (checkbox) {
+                    const isSelected = state.selected.includes(categoryId);
+                    checkbox.checked = isSelected;
+                    const isDisabled = !isSelected && count >= 3;
+                    checkbox.disabled = isDisabled;
+                    const container = checkbox.closest('.dropdown-item');
+                    if (container) {
+                        if (isDisabled) container.classList.add('disabled');
+                        else container.classList.remove('disabled');
+                    }
+                }
+            });
+        }
+
+        window.removeCategory = function(page, categoryId) {
+            const state = getState(page);
+            const index = state.selected.indexOf(categoryId);
+            if (index > -1) {
+                state.selected.splice(index, 1);
+                const checkbox = document.getElementById(`${page}_cat_${categoryId}`);
+                if (checkbox) checkbox.checked = false;
+                delete state.results[categoryId];
+                setState(page, state);
+                updateSelectionUI(page);
+                updateAnalyzeButton(page);
+                document.getElementById(`${page}Results`).innerHTML = '';
+            }
+        };
+
+        function updateAnalyzeButton(page) {
+            const state = getState(page);
+            const btn = document.getElementById(`${page}AnalyzeBtn`);
+            btn.disabled = state.selected.length === 0;
+        }
+
+        function toggleDropdown(page) {
+            const content = document.getElementById(`${page}DropdownContent`);
+            const arrow = document.getElementById(`${page}DropdownArrow`);
+            const btn = document.getElementById(`${page}DropdownBtn`);
+            content.classList.toggle('show');
+            arrow.classList.toggle('open');
+            btn.classList.toggle('active');
+        }
+
+        function closeDropdown(page) {
+            const content = document.getElementById(`${page}DropdownContent`);
+            const arrow = document.getElementById(`${page}DropdownArrow`);
+            const btn = document.getElementById(`${page}DropdownBtn`);
+            content?.classList.remove('show');
+            arrow?.classList.remove('open');
+            btn?.classList.remove('active');
+        }
+        // ========== CUSTOM WEEK/MONTH ANALYSIS FUNCTIONS ==========
+
+// Show custom cards after analysis
+function showCustomCards(page) {
+    if (page === 'current') {
+        const customCards = document.getElementById('currentCustomCards');
+        if (customCards) customCards.style.display = 'block';
+    } else if (page === 'weekly') {
+        const customCards = document.getElementById('weeklyCustomCards');
+        if (customCards) customCards.style.display = 'block';
+    } else if (page === 'monthly') {
+        const customCards = document.getElementById('monthlyCustomCards');
+        if (customCards) customCards.style.display = 'block';
+    }
+}
+
+// Custom Week Analysis
+async function analyzeCustomWeek() {
+    const platformSelect = document.getElementById('currentPlatformSelect');
+    const platform = platformSelect ? platformSelect.value : '';
+    
+    if (!platform) {
+        alert('Please select a platform first');
+        return;
+    }
+    
+    if (currentState.selected.length === 0) {
+        alert('Please select at least one category first');
+        return;
+    }
+    
+    const days = document.getElementById('weekDaysSelect').value;
+    const category = currentState.selected[0];
+    
+    const resultDiv = document.getElementById('weekResult');
+    resultDiv.innerHTML = '<div style="text-align: center; padding: 20px;"><div class="spinner" style="margin: 0 auto;"></div><p>Analyzing...</p></div>';
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/analyze-custom`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                platform: platform,
+                category: category,
+                unit: 'days',
+                duration: parseInt(days),
+                max_products: 50
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        displayCustomResult(data, 'weekResult');
+        
+    } catch (error) {
+        resultDiv.innerHTML = `
+            <div style="background: #fee2e2; padding: 15px; border-radius: 12px; color: #991b1b;">
+                <i class="fas fa-exclamation-circle"></i> Error: ${error.message}<br>
+                <small>Please run Current Analysis first to collect daily data.</small>
+            </div>
+        `;
+    }
+}
+
+// Custom Month Analysis
+async function analyzeCustomMonth() {
+    const platformSelect = document.getElementById('currentPlatformSelect');
+    const platform = platformSelect ? platformSelect.value : '';
+    
+    if (!platform) {
+        alert('Please select a platform first');
+        return;
+    }
+    
+    if (currentState.selected.length === 0) {
+        alert('Please select at least one category first');
+        return;
+    }
+    
+    const weeks = document.getElementById('monthWeeksSelect').value;
+    const category = currentState.selected[0];
+    
+    const resultDiv = document.getElementById('monthResult');
+    resultDiv.innerHTML = '<div style="text-align: center; padding: 20px;"><div class="spinner" style="margin: 0 auto;"></div><p>Analyzing...</p></div>';
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/analyze-custom`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                platform: platform,
+                category: category,
+                unit: 'weeks',
+                duration: parseInt(weeks),
+                max_products: 50
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        displayCustomResult(data, 'monthResult');
+        
+    } catch (error) {
+        resultDiv.innerHTML = `
+            <div style="background: #fee2e2; padding: 15px; border-radius: 12px; color: #991b1b;">
+                <i class="fas fa-exclamation-circle"></i> Error: ${error.message}<br>
+                <small>Please run Weekly analysis first to collect weekly data.</small>
+            </div>
+        `;
+    }
+}
+
+// Display Custom Result
+function displayCustomResult(data, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.error("Container not found:", containerId);
+        return;
+    }
+    
+    console.log("Displaying custom result:", data);
+    
+    let trendIcon = '';
+    let trendColor = '';
+    if (data.trend === 'increasing') {
+        trendIcon = '📈 Increasing';
+        trendColor = '#10b981';
+    } else if (data.trend === 'decreasing') {
+        trendIcon = '📉 Decreasing';
+        trendColor = '#ef4444';
+    } else {
+        trendIcon = '➡️ Stable';
+        trendColor = '#f59e0b';
+    }
+    
+    // ✅ FIXED LABELS
+    const labels = data.daily_scores.map((_, i) => {
+        if (i === 0) return 'Start';
+        if (data.unit === 'weeks') return `Week ${i}`;
+        return `Day ${i}`;
+    });
+    
+    const chartId = `trendChart_${Date.now()}_${Math.random()}`;
+    
+    container.innerHTML = `
+        <div class="result-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                <div>
+                    <h4 style="margin: 0 0 5px 0; color: #333;">
+                        <i class="fas fa-chart-line"></i> ${data.data_points} ${data.unit} Analysis
+                    </h4>
+                    <p style="margin: 0; color: #666; font-size: 0.85rem;">
+                        <i class="fas fa-calendar"></i> ${data.start_date} to ${data.end_date}
+                    </p>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #667eea;">${data.avg_polarization_score}</div>
+                    <div style="font-size: 0.7rem; color: #888;">Avg Polarization</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 1.2rem; font-weight: bold; color: ${trendColor};">${trendIcon}</div>
+                    <div style="font-size: 0.7rem; color: #888;">Trend</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 1.2rem; font-weight: bold;">${data.data_points}</div>
+                    <div style="font-size: 0.7rem; color: #888;">Data Points</div>
+                </div>
+            </div>
+            <div style="margin-top: 20px; height: 260px; position: relative;">
+                <canvas id="${chartId}" style="width: 100%; height: 100%;"></canvas>
+            </div>
+            <div style="margin-top: 15px; font-size: 0.8rem; color: #666; text-align: center;">
+                <i class="fas fa-chart-line"></i> Polarization trend over ${data.data_points} ${data.unit === 'days' ? 'days' : 'weeks'}
+            </div>
+        </div>
+    `;
+    
+    // Initialize chart
+    setTimeout(() => {
+        const ctx = document.getElementById(chartId)?.getContext('2d');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Polarization Score',
+                        data: data.daily_scores,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 3,
+                        pointRadius: 5,
+                        pointBackgroundColor: '#667eea',
+                        pointBorderColor: 'white',
+                        pointBorderWidth: 2,
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => `Score: ${context.raw.toFixed(4)}`
+                            }
+                        }
+                    },
+                    scales: {
+    y: {
+        title: { display: true, text: 'Polarization Score' },
+        min: 0,      // ← FORCE from ZERO
+        max: 1.0,
+        ticks: {
+            stepSize: 0.2,  // 0, 0.2, 0.4, 0.6, 0.8, 1.0
+            callback: function(value) {
+                return value.toFixed(1);
+            }
+        },
+        grid: { color: '#e0e0e0' }
+    },
+    x: {
+        title: { display: true, text: data.unit === 'weeks' ? 'Week' : 'Day' },
+        grid: { display: false }
+    }
+}
+                }
+            });
+        }
+    }, 100);
+}
+function initCustomAnalysis() {
+    // Current page buttons
+    const currentWeekBtn = document.getElementById('analyzeCustomWeekBtn');
+    const currentMonthBtn = document.getElementById('analyzeCustomMonthBtn');
+    
+    if (currentWeekBtn) {
+        currentWeekBtn.addEventListener('click', analyzeCustomWeek);
+    }
+    if (currentMonthBtn) {
+        currentMonthBtn.addEventListener('click', analyzeCustomMonth);
+    }
+    
+    // Weekly page button
+    const weeklyCustomWeekBtn = document.getElementById('weeklyCustomWeekBtn');
+    if (weeklyCustomWeekBtn) {
+        weeklyCustomWeekBtn.addEventListener('click', analyzeWeeklyCustomWeek);
+    }
+    
+    // Monthly page button
+    const monthlyCustomMonthBtn = document.getElementById('monthlyCustomMonthBtn');
+    if (monthlyCustomMonthBtn) {
+        monthlyCustomMonthBtn.addEventListener('click', analyzeMonthlyCustomMonth);
+    }
+}
+// Call initCustomAnalysis in DOMContentLoaded
+// Existing DOMContentLoaded main yeh add karo
+
+        function setLoading(page, show) {
+            const container = document.getElementById(`${page}LoadingContainer`);
+            const btn = document.getElementById(`${page}AnalyzeBtn`);
+            container.style.display = show ? 'block' : 'none';
+            btn.disabled = show;
+            if (show) closeDropdown(page);
+        }
+
+        function updateStep(page, stepNumber) {
+            for (let i = 1; i <= 4; i++) {
+                const step = document.getElementById(`${page}Step${i}`);
+                step.classList.remove('active', 'completed');
+                if (i < stepNumber) {
+                    step.classList.add('completed');
+                } else if (i === stepNumber) {
+                    step.classList.add('active');
+                }
+            }
+        }
+
+        async function simulateProcessing(page) {
+            return new Promise((resolve) => {
+                let seconds = 3;
+                const timerElement = document.getElementById(`${page}Timer`);
+                const timerInterval = setInterval(() => {
+                    seconds--;
+                    timerElement.textContent = `Processing... ${seconds}s`;
+                    if (seconds === 2) updateStep(page, 2);
+                    else if (seconds === 1) updateStep(page, 3);
+                }, 1000);
+                
+                setTimeout(() => {
+                    clearInterval(timerInterval);
+                    updateStep(page, 4);
+                    setTimeout(resolve, 500);
+                }, 3000);
+            });
+        }
+
+        async function runAnalysis(page) {
+    const state = getState(page);
+    if (state.selected.length === 0) return;
+    
+    // ✅ Disable button to prevent multiple clicks
+    const analyzeBtn = document.getElementById(`${page}AnalyzeBtn`);
+    if (analyzeBtn.disabled) return; // Already running
+    analyzeBtn.disabled = true;
+    
+    try {
+        setLoading(page, true);
+        
+                updateStep(page, 1);
+                await simulateProcessing(page);
+                
+                let analysisType = 'current';
+                if (page === 'weekly') analysisType = 'weekly';
+                if (page === 'monthly') analysisType = 'monthly';
+                
+                // Fetch analysis for each category
+                for (let i = 0; i < state.selected.length; i++) {
+                    const category = state.selected[i];
+                    console.log(`📡 Analyzing ${page} - ${state.platform} - ${category}`);
+                    
+                    // ✅ Add username and role to URL
+const url = `${API_BASE_URL}/api/analyze?username=${username}&role=${role}`;
+
+const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        platform: state.platform,
+        category: category,
+        subcategory: category,
+        max_products: 50,
+        analysis_type: analysisType,
+        save_to_db: true
+    })
+});
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        state.results[category] = data;
+                    }
+                }
+                
+                // Fetch comparison data for difference display
+                for (let i = 0; i < state.selected.length; i++) {
+                    const category = state.selected[i];
+                    try {
+                        const compResponse = await fetch(`${API_BASE_URL}/api/comparison/${state.platform}/${category}`);
+                        if (compResponse.ok) {
+                            const compData = await compResponse.json();
+                            if (page === 'current') currentComparisonData[category] = compData;
+                            else if (page === 'weekly') weeklyComparisonData[category] = compData;
+                            else monthlyComparisonData[category] = compData;
+                        }
+                    } catch(e) { console.error(e); }
+                }
+                
+                setState(page, state);
+                displayResults(page);
+                
+            } catch (error) {
+                console.error('❌ Analysis failed:', error);
+                alert(`❌ Error: ${error.message}`);
+            } finally {
+        setLoading(page, false);
+        // ✅ Re-enable button after completion
+        analyzeBtn.disabled = false;
+    }
+        }
+
+        // Weekly page custom week analysis
+async function analyzeWeeklyCustomWeek() {
+    const platform = document.getElementById('weeklyPlatformSelect').value;
+    
+    if (!platform || weeklyState.selected.length === 0) {
+        alert('Please select platform and categories first');
+        return;
+    }
+    
+    const days = document.getElementById('weeklyWeekDaysSelect').value;
+    
+    // Show tabs container
+    const tabsContainer = document.getElementById('weeklyCustomTabs');
+    const tabContentsContainer = document.getElementById('weeklyCustomTabContents');
+    
+    tabsContainer.style.display = 'flex';
+    tabsContainer.innerHTML = '';
+    tabContentsContainer.innerHTML = '';
+    
+    // Store results for each category
+    const customResults = {};
+    
+    // Create tabs and loading placeholders for each category
+    for (let i = 0; i < weeklyState.selected.length; i++) {
+        const category = weeklyState.selected[i];
+        const categoryDisplay = category.replace(/_/g, ' ').split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+        
+        // Add tab button
+        const tabBtn = document.createElement('button');
+        tabBtn.className = `result-tab ${i === 0 ? 'active' : ''}`;
+        tabBtn.textContent = `${categoryDisplay} (Loading...)`;
+        tabBtn.onclick = (function(cat) {
+            return function() { switchCustomTab('weekly', cat); };
+        })(category);
+        tabsContainer.appendChild(tabBtn);
+        
+        // Add loading content
+        const tabContent = document.createElement('div');
+        tabContent.id = `weeklyCustomTab_${category}`;
+        tabContent.className = `tab-content ${i === 0 ? 'active' : ''}`;
+        tabContent.innerHTML = `<div class="loading-spinner"><div class="spinner"></div><p>Analyzing ${categoryDisplay}...</p></div>`;
+        tabContentsContainer.appendChild(tabContent);
+    }
+    
+    // Fetch data for each category
+    for (let i = 0; i < weeklyState.selected.length; i++) {
+        const category = weeklyState.selected[i];
+        const categoryDisplay = category.replace(/_/g, ' ').split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/analyze-custom`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    platform: platform,
+                    category: category,
+                    unit: 'days',
+                    duration: parseInt(days),
+                    max_products: 50
+                })
+            });
+            
+            const data = await response.json();
+            customResults[category] = data;
+            
+            // Store graph data globally
+            if (!window.customGraphData) window.customGraphData = {};
+            if (!window.customGraphData['weekly']) window.customGraphData['weekly'] = {};
+            // Store graph data globally with platform
+window.customGraphData['weekly'][category] = {
+    ...data,
+    platform: platform  // ← Add this line
+};
+            // Update tab button text
+            const tabs = document.querySelectorAll('#weeklyCustomTabs .result-tab');
+            if (tabs[i]) {
+                tabs[i].textContent = `${categoryDisplay} (${data.avg_polarization_score})`;
+            }
+            
+            // Update tab content
+            const tabContentDiv = document.getElementById(`weeklyCustomTab_${category}`);
+            if (tabContentDiv) {
+                tabContentDiv.innerHTML = generateCustomGraphHTMLWithoutChart(data, categoryDisplay);
+            }
+            
+        } catch (error) {
+            const tabContentDiv = document.getElementById(`weeklyCustomTab_${category}`);
+            if (tabContentDiv) {
+                tabContentDiv.innerHTML = `<div style="background: #fee2e2; padding: 15px; border-radius: 12px;">Error: ${error.message}</div>`;
+            }
+        }
+    }
+    
+    // Initialize chart for first category
+    setTimeout(() => {
+        if (weeklyState.selected.length > 0) {
+            initializeGraphInTab('weekly', weeklyState.selected[0]);
+        }
+    }, 200);
+}
+function switchCustomTab(page, category) {
+    // Update tab buttons
+    const tabsContainer = document.getElementById(`${page}CustomTabs`);
+    const tabs = tabsContainer.querySelectorAll('.result-tab');
+    tabs.forEach(tab => tab.classList.remove('active'));
+    
+    const clickedTab = Array.from(tabs).find(tab => 
+        tab.textContent.toLowerCase().includes(category.replace(/_/g, ' '))
+    );
+    if (clickedTab) clickedTab.classList.add('active');
+    
+    // Update content visibility
+    const contentsContainer = document.getElementById(`${page}CustomTabContents`);
+    const contents = contentsContainer.querySelectorAll('.tab-content');
+    contents.forEach(content => content.classList.remove('active'));
+    
+    const targetContent = document.getElementById(`${page}CustomTab_${category}`);
+    if (targetContent) targetContent.classList.add('active');
+    
+    // Re-initialize graph
+    setTimeout(() => {
+        initializeGraphInTab(page, category);
+    }, 100);
+}
+function initializeGraphInTab(page, category) {
+    const activeContent = document.getElementById(`${page}CustomTab_${category}`);
+    if (!activeContent) return;
+    
+    const canvas = activeContent.querySelector('canvas');
+    if (!canvas) return;
+    
+    const graphData = window.customGraphData?.[page]?.[category];
+    if (!graphData) return;
+    
+    if (window.customCharts?.[page]?.[category]) {
+        window.customCharts[page][category].destroy();
+    }
+    
+    const ctx = canvas.getContext('2d');
+    const labels = graphData.daily_scores.map((_, i) => 
+        i === 0 ? 'Start' : (graphData.unit === 'weeks' ? `Week ${i+1}` : `Day ${i+1}`)
+    );
+    
+    const newChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Polarization Score',
+                data: graphData.daily_scores,
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                borderWidth: 3,
+                pointRadius: 5,
+                pointBackgroundColor: '#667eea',
+                pointBorderColor: 'white',
+                pointBorderWidth: 2,
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: { legend: { display: false } },
+            onClick: (event, activeElements) => {
+        if (activeElements.length > 0) {
+            const dataPoint = activeElements[0];
+            const datasetIndex = dataPoint.datasetIndex;
+            const dataIndex = dataPoint.index;
+            
+            const clickedDate = graphData.dates[dataIndex];
+            const clickedScore = graphData.daily_scores[dataIndex];
+            const dayNumber = dataIndex + 1;
+            
+            // Show products modal
+           // Get platform from graphData
+        // Get platform from graphData
+const platform = graphData.platform || 'Daraz.pk';
+showDailyProducts(graphData.category, graphData.dates[dataIndex], dayNumber, clickedScore);
+        }
+    },
+            scales: {
+                y: { 
+                    title: { display: true, text: 'Polarization Score' },
+                    min: 0,      // ← YAHAN CHANGE KARO (0.2 se 0 karo)
+                    max: 1.0,
+                    ticks: { stepSize: 0.2 },
+                    grid: { color: '#e0e0e0' }
+                },
+                x: { 
+                    title: { display: true, text: graphData.unit === 'weeks' ? 'Week' : 'Day' },
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+    
+    if (!window.customCharts) window.customCharts = {};
+    if (!window.customCharts[page]) window.customCharts[page] = {};
+    window.customCharts[page][category] = newChart;
+}
+function generateCustomGraphHTMLWithoutChart(data, categoryName) {
+    let trendIcon = '';
+    let trendColor = '';
+    
+    if (data.trend === 'increasing') {
+        trendIcon = '📈 Increasing';
+        trendColor = '#10b981';
+    } else if (data.trend === 'decreasing') {
+        trendIcon = '📉 Decreasing';
+        trendColor = '#ef4444';
+    } else {
+        trendIcon = '➡️ Stable';
+        trendColor = '#f59e0b';
+    }
+    
+    const chartId = `customChart_${data.category}_fixed`;
+    
+    return `
+        <div class="platform-badge" style="margin-bottom: 15px;">
+            <span>📊</span>
+            <span><strong>${categoryName}</strong> | ${data.data_points} ${data.unit === 'days' ? 'Days' : 'Weeks'} | ${data.start_date} to ${data.end_date}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px;">
+            <div style="text-align: center; flex: 1;">
+                <div style="font-size: 2rem; font-weight: bold; color: #667eea;">${data.avg_polarization_score}</div>
+                <div style="font-size: 0.75rem; color: #888;">Average Polarization</div>
+            </div>
+            <div style="text-align: center; flex: 1;">
+                <div style="font-size: 1.2rem; font-weight: bold; color: ${trendColor};">${trendIcon}</div>
+                <div style="font-size: 0.75rem; color: #888;">Trend</div>
+            </div>
+            <div style="text-align: center; flex: 1;">
+                <div style="font-size: 1.2rem; font-weight: bold;">${data.data_points}</div>
+                <div style="font-size: 0.75rem; color: #888;">Data Points</div>
+            </div>
+        </div>
+        <div style="height: 280px;">
+            <canvas id="${chartId}" style="width: 100%; height: 100%;"></canvas>
+        </div>
+    `;
+}
+// Monthly page custom month analysis
+async function analyzeMonthlyCustomMonth() {
+    const platform = document.getElementById('monthlyPlatformSelect').value;
+    
+    if (!platform || monthlyState.selected.length === 0) {
+        alert('Please select platform and categories first');
+        return;
+    }
+    
+    const weeks = document.getElementById('monthlyMonthWeeksSelect').value;
+    
+    // Show tabs container
+    const tabsContainer = document.getElementById('monthlyCustomTabs');
+    const tabContentsContainer = document.getElementById('monthlyCustomTabContents');
+    
+    tabsContainer.style.display = 'flex';
+    tabsContainer.innerHTML = '';
+    tabContentsContainer.innerHTML = '';
+    
+    // Create tabs and loading placeholders for each category
+    for (let i = 0; i < monthlyState.selected.length; i++) {
+        const category = monthlyState.selected[i];
+        const categoryDisplay = category.replace(/_/g, ' ').split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+        
+        // Add tab button
+        const tabBtn = document.createElement('button');
+        tabBtn.className = `result-tab ${i === 0 ? 'active' : ''}`;
+        tabBtn.textContent = `${categoryDisplay} (Loading...)`;
+        tabBtn.onclick = (function(cat) {
+            return function() { switchCustomTab('monthly', cat); };
+        })(category);
+        tabsContainer.appendChild(tabBtn);
+        
+        // Add loading content
+        const tabContent = document.createElement('div');
+        tabContent.id = `monthlyCustomTab_${category}`;
+        tabContent.className = `tab-content ${i === 0 ? 'active' : ''}`;
+        tabContent.innerHTML = `<div class="loading-spinner"><div class="spinner"></div><p>Analyzing ${categoryDisplay}...</p></div>`;
+        tabContentsContainer.appendChild(tabContent);
+    }
+    
+    // Fetch data for each category
+    for (let i = 0; i < monthlyState.selected.length; i++) {
+        const category = monthlyState.selected[i];
+        const categoryDisplay = category.replace(/_/g, ' ').split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/analyze-custom`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    platform: platform,
+                    category: category,
+                    unit: 'weeks',
+                    duration: parseInt(weeks),
+                    max_products: 50
+                })
+            });
+            
+            const data = await response.json();
+            
+            // Store graph data globally
+            if (!window.customGraphData) window.customGraphData = {};
+            if (!window.customGraphData['monthly']) window.customGraphData['monthly'] = {};
+            window.customGraphData['monthly'][category] = data;
+            
+            // Update tab button text
+            const tabs = document.querySelectorAll('#monthlyCustomTabs .result-tab');
+            if (tabs[i]) {
+                tabs[i].textContent = `${categoryDisplay} (${data.avg_polarization_score})`;
+            }
+            
+            // Update tab content
+            const tabContentDiv = document.getElementById(`monthlyCustomTab_${category}`);
+            if (tabContentDiv) {
+                tabContentDiv.innerHTML = generateCustomGraphHTMLWithoutChart(data, categoryDisplay);
+            }
+            
+        } catch (error) {
+            const tabContentDiv = document.getElementById(`monthlyCustomTab_${category}`);
+            if (tabContentDiv) {
+                tabContentDiv.innerHTML = `<div style="background: #fee2e2; padding: 15px; border-radius: 12px;">Error: ${error.message}</div>`;
+            }
+        }
+    }
+    
+    // Initialize chart for first category
+    setTimeout(() => {
+        if (monthlyState.selected.length > 0) {
+            initializeGraphInTab('monthly', monthlyState.selected[0]);
+        }
+    }, 200);
+}
+        function displayResults(page) {
+            const state = getState(page);
+            const categories = state.selected;
+            if (categories.length === 0) return;
+            
+            const resultsContainer = document.getElementById(`${page}Results`);
+            const pageTitle = page === 'current' ? 'CURRENT' : (page === 'weekly' ? 'WEEKLY' : 'MONTHLY');
+            const analysisType = page;
+            
+            let html = `
+                <div class="card">
+                    <h2><i>📈</i> ${pageTitle} Analysis Results</h2>
+                    <div class="results-tabs" id="${page}ResultsTabs">
+                
+            `;
+            
+            categories.forEach((category, idx) => {
+                const name = category.replace(/_/g, ' ').split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+                html += `<button class="result-tab ${idx === 0 ? 'active' : ''}" onclick="switchTab('${page}', '${category}')">${name}</button>`;
+            });
+            
+            html += `</div><div id="${page}TabContents">`;
+            
+            categories.forEach((category, idx) => {
+                const data = state.results[category];
+                if (!data) return;
+                
+                const categoryName = category.replace(/_/g, ' ').split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+                const priceSymbol = state.platform === 'daraz' ? 'Rs' : '$';
+                
+                // Get comparison data for difference
+                let weeklyDiff = null;
+                let monthlyDiff = null;
+                let weeklyScore = null;
+                let monthlyScore = null;
+                
+                if (page === 'current') {
+                    weeklyScore = currentComparisonData[category]?.weekly_avg;
+                    monthlyScore = currentComparisonData[category]?.monthly_avg;
+                    if (weeklyScore) weeklyDiff = ((data.polarization_score - weeklyScore) / weeklyScore * 100).toFixed(1);
+                    if (monthlyScore) monthlyDiff = ((data.polarization_score - monthlyScore) / monthlyScore * 100).toFixed(1);
+                } else if (page === 'weekly') {
+                    // For weekly page, show difference with current
+                    const currentData = currentState.results[category];
+                    if (currentData) {
+                        weeklyDiff = ((data.polarization_score - currentData.polarization_score) / currentData.polarization_score * 100).toFixed(1);
+                    }
+                } else if (page === 'monthly') {
+                    // For monthly page, show difference with current
+                    const currentData = currentState.results[category];
+                    if (currentData) {
+                        monthlyDiff = ((data.polarization_score - currentData.polarization_score) / currentData.polarization_score * 100).toFixed(1);
+                    }
+                }
+                
+                // Difference Cards HTML
+                let diffHtml = '';
+                if (page === 'current') {
+                    
+            diffHtml = ''; 
+                } else if (page === 'weekly') {
+                    diffHtml = `
+                        <div class="difference-grid">
+                            <div class="difference-card weekly-diff">
+                                <h4><i class="fas fa-chart-line"></i> Weekly vs Current Difference</h4>
+                                ${weeklyDiff ? `
+                                    <div class="difference-value ${weeklyDiff >= 0 ? (weeklyDiff > 0 ? 'positive' : 'negative') : (weeklyDiff < 0 ? 'negative' : 'neutral')}">
+                                        ${weeklyDiff >= 0 ? '+' : ''}${weeklyDiff}%
+                                    </div>
+                                    <div class="difference-label">Weekly: ${data.polarization_score.toFixed(3)} | Current: ${currentState.results[category]?.polarization_score?.toFixed(3) || 'N/A'}</div>
+                                ` : '<div class="difference-value neutral">N/A</div><div class="difference-label">Run Current analysis first</div>'}
+                            </div>
+                        </div>
+                    `;
+                } else if (page === 'monthly') {
+                    diffHtml = `
+                        <div class="difference-grid">
+                            <div class="difference-card monthly-diff">
+                                <h4><i class="fas fa-chart-line"></i> Monthly vs Current Difference</h4>
+                                ${monthlyDiff ? `
+                                    <div class="difference-value ${monthlyDiff >= 0 ? (monthlyDiff > 0 ? 'positive' : 'negative') : (monthlyDiff < 0 ? 'negative' : 'neutral')}">
+                                        ${monthlyDiff >= 0 ? '+' : ''}${monthlyDiff}%
+                                    </div>
+                                    <div class="difference-label">Monthly: ${data.polarization_score.toFixed(3)} | Current: ${currentState.results[category]?.polarization_score?.toFixed(3) || 'N/A'}</div>
+                                ` : '<div class="difference-value neutral">N/A</div><div class="difference-label">Run Current analysis first</div>'}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // Top products
+                let productsHtml = '';
+                if (data.products && data.products.length > 0) {
+                    data.products.slice(0, 10).forEach((p, i) => {
+                        const finalScore = ((p.rating/5)*0.35 + (Math.min(p.reviews,1000)/1000)*0.30 + p.popularity_score*0.20 + (1-Math.min(p.price, state.platform==='daraz'?5000:200)/(state.platform==='daraz'?5000:200))*0.15).toFixed(3);
+                        const price = state.platform === 'daraz' ? `Rs ${Math.round(p.price).toLocaleString()}` : `$${p.price.toFixed(2)}`;
+                        let badgeClass = p.cluster_label === 'Budget' ? 'badge-budget' : (p.cluster_label === 'Premium' ? 'badge-premium' : 'badge-mid');
+                        
+                        productsHtml += `<tr>
+                            <td style="text-align: center;"><span class="rank-badge">${i+1}</span></td>
+                            <td>${p.name.substring(0, 50)}${p.name.length > 50 ? '...' : ''}</td>
+                            <td><strong>${price}</strong></td>
+                            <td>${p.rating.toFixed(1)} ⭐</td>
+                            <td>${p.reviews.toLocaleString()}</td>
+                            <td>${(p.popularity_score*100).toFixed(0)}%</td>
+                            <td><span class="score-highlight">${finalScore}</span></td>
+                            <td><span class="cluster-badge ${badgeClass}">${p.cluster_label}</span></td>
+                        </tr>`;
+                    });
+                }
+                
+                // Clusters
+                let clustersHtml = '';
+                if (data.clusters) {
+                    data.clusters.forEach(c => {
+                        let clusterClass = c.label === 'Budget' ? 'budget' : (c.label === 'Premium' ? 'premium' : 'mid-range');
+                        clustersHtml += `
+                            <div class="cluster-card ${clusterClass}">
+                                <div class="cluster-header">
+                                    <span class="cluster-name">${c.label === 'Budget' ? '💰' : (c.label === 'Premium' ? '💎' : '⚖️')} ${c.label}</span>
+                                    <span class="cluster-size">${c.size} products</span>
+                                </div>
+                                <div class="cluster-detail"><span>Average Price:</span><span><strong>${priceSymbol} ${c.avg_price.toLocaleString()}</strong></span></div>
+                                <div class="cluster-detail"><span>Average Rating:</span><span><strong>${c.avg_rating.toFixed(2)} ⭐</strong></span></div>
+                                <div class="cluster-detail"><span>Market Share:</span><span><strong>${c.percentage}%</strong></span></div>
+                            </div>
+                        `;
+                    });
+                }
+                
+                // Features
+                let featuresHtml = '';
+                if (data.feature_importance) {
+                    const icons = { price: '💰', rating: '⭐', reviews: '📝', popularity: '🔥' };
+                    const names = { price: 'Price', rating: 'Rating', reviews: 'Reviews', popularity: 'Popularity' };
+                    Object.entries(data.feature_importance).forEach(([k, v]) => {
+                        featuresHtml += `
+                            <div class="feature-card">
+                                <div class="feature-name">${icons[k]} ${names[k]}</div>
+                                <div class="feature-value">${v}%</div>
+                            </div>
+                        `;
+                    });
+                }
+                
+                html += `
+                    <div id="${page}Tab_${category}" class="tab-content ${idx === 0 ? 'active' : ''}">
+                        <div class="platform-badge ${state.platform === 'daraz' ? 'daraz' : 'etsy'}" style="margin-bottom: 20px;">
+                            <span>${state.platform === 'daraz' ? '📦' : '🛍️'}</span>
+                            <span><strong>${data.platform}</strong> | Category: ${categoryName} | Products: ${data.total_products} | ${pageTitle} Analysis</span>
+                            <span class="data-source-badge data-source-csv" style="margin-left: auto;">✅ ${data.data_source}</span>
+                        </div>
+                        
+                        ${diffHtml}
+                        
+                        <div class="polarization-container">
+                            <div class="polarization-label">${pageTitle} POLARIZATION LEVEL</div>
+                            <div class="polarization-value">${data.polarization_score.toFixed(3)}</div>
+                            <div class="polarization-level">${data.polarization_level}</div>
+                            <div class="meter-container">
+                                <div class="meter"><div class="meter-fill" style="width: ${data.polarization_score * 100}%"></div></div>
+                                <div class="meter-labels"><span>Low</span><span>Medium</span><span>High</span><span>Very High</span></div>
+                            </div>
+                            <div style="margin-top: 20px; padding: 12px; background: rgba(255,255,255,0.15); border-radius: 10px;">
+                                <div style="font-size: 0.95rem; opacity: 0.9;">Cluster Quality (Silhouette Score)</div>
+                                <div style="font-size: 1.8rem; font-weight: bold; margin: 8px 0;">${data.silhouette_score ? data.silhouette_score.toFixed(4) : '0.000'}</div>
+                                <div style="font-size: 0.85rem; opacity: 0.85;">${getSilhouetteLabel(data.silhouette_score)}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="top-products-header">
+                            <h3 style="margin: 20px 0 10px;"><i>🏆</i> Top 10 Products</h3>
+                            <div class="ranking-info"><strong>Ranking Formula:</strong> Score = (Rating × 0.35) + (Reviews × 0.30) + (Popularity × 0.20) + (Price Factor × 0.15)</div>
+                        </div>
+                        <div class="table-container">
+                            <table class="product-table">
+                                <thead><tr><th>Rank</th><th>Product Name</th><th>Price</th><th>Rating</th><th>Reviews</th><th>Popularity</th><th>Final Score</th><th>Cluster</th></tr></thead>
+                                <tbody>${productsHtml || '<tr><td colspan="8">No products found</td></tr>'}</tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="charts-grid">
+                            <div class="chart-card"><h3><span>🔵</span> Cluster Distribution</h3><div class="chart-container"><canvas id="${page}_scatter_${category}"></canvas></div></div>
+                            <div class="chart-card"><h3><span>📊</span> Cluster Comparison</h3><div class="chart-container"><canvas id="${page}_bar_${category}"></canvas></div></div>
+                        </div>
+                        
+                        <h3 style="margin: 20px 0 10px;"><i>📦</i> Product Clusters</h3>
+                        <div class="clusters-grid">${clustersHtml || '<div>No cluster data available</div>'}</div>
+                        
+                        <h3 style="margin: 20px 0 10px;"><i>⚖️</i> Feature Importance</h3>
+                        <div class="features-grid">${featuresHtml || '<div>No feature data available</div>'}</div>
+                    </div>
+                `;
+            });
+            
+            html += `</div></div>`;
+            resultsContainer.innerHTML = html;
+            // After resultsContainer.innerHTML = html;
+
+// Show custom cards for respective page
+if (page === 'current') {
+    showCustomCards('current');
+} else if (page === 'weekly') {
+    showCustomCards('weekly');
+} else if (page === 'monthly') {
+    showCustomCards('monthly');
+}
+            // Initialize charts
+            categories.forEach(category => {
+                const data = state.results[category];
+                if (data) {
+                    initCharts(page, category, data);
+                }
+            });
+
+        }
+
+        function initCharts(page, category, data) {
+            const priceSymbol = getState(page).platform === 'daraz' ? 'PKR' : 'USD';
+            
+            const scatterCtx = document.getElementById(`${page}_scatter_${category}`)?.getContext('2d');
+            if (scatterCtx) {
+                const budgetData = data.products.filter(p => p.cluster_label === 'Budget').map(p => ({ x: p.price, y: p.rating }));
+                const midData = data.products.filter(p => p.cluster_label === 'Mid-Range').map(p => ({ x: p.price, y: p.rating }));
+                const premiumData = data.products.filter(p => p.cluster_label === 'Premium').map(p => ({ x: p.price, y: p.rating }));
+                
+                new Chart(scatterCtx, {
+                    type: 'scatter',
+                    data: {
+                        datasets: [
+                            { label: 'Budget', data: budgetData, backgroundColor: '#48bb78', pointRadius: 6 },
+                            { label: 'Mid-Range', data: midData, backgroundColor: '#ecc94b', pointRadius: 6 },
+                            { label: 'Premium', data: premiumData, backgroundColor: '#9f7aea', pointRadius: 6 }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: { title: { display: true, text: `Price (${priceSymbol})` } },
+                            y: { title: { display: true, text: 'Rating' }, min: 0, max: 5 }
+                        }
+                    }
+                });
+            }
+            
+            const barCtx = document.getElementById(`${page}_bar_${category}`)?.getContext('2d');
+            if (barCtx && data.clusters) {
+                new Chart(barCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.clusters.map(c => c.label),
+                        datasets: [
+                            { label: 'Avg Price', data: data.clusters.map(c => c.avg_price), backgroundColor: '#667eea', yAxisID: 'y1' },
+                            { label: 'Avg Rating', data: data.clusters.map(c => c.avg_rating), backgroundColor: '#fbbf24', yAxisID: 'y2' }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y1: { title: { display: true, text: `Price (${priceSymbol})` }, position: 'left' },
+                            y2: { title: { display: true, text: 'Rating' }, position: 'right', min: 0, max: 5, grid: { drawOnChartArea: false } }
+                        }
+                    }
+                });
+            }
+        }
+
+        function getSilhouetteLabel(score) {
+            if (!score) return "Fair clustering";
+            if (score >= 0.7) return "Excellent clustering";
+            if (score >= 0.5) return "Good clustering";
+            if (score >= 0.25) return "Fair clustering";
+            return "Weak clustering";
+        }
+
+        window.switchPage = function(page) {
+            document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.page-content').forEach(content => content.classList.remove('active'));
+            
+            if (page === 'current') {
+                document.querySelector('.nav-tab').classList.add('active');
+            } else if (page === 'weekly') {
+                document.querySelectorAll('.nav-tab')[1].classList.add('active');
+            } else {
+                document.querySelectorAll('.nav-tab')[2].classList.add('active');
+            }
+            
+            document.getElementById(`${page}Page`).classList.add('active');
+        };
+
+        window.switchTab = function(page, category) {
+            document.querySelectorAll(`#${page}ResultsTabs .result-tab`).forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll(`#${page}TabContents .tab-content`).forEach(content => content.classList.remove('active'));
+            
+            const clickedTab = Array.from(document.querySelectorAll(`#${page}ResultsTabs .result-tab`)).find(tab => 
+                tab.textContent.includes(category.replace(/_/g, ' '))
+            );
+            if (clickedTab) clickedTab.classList.add('active');
+            
+            const targetContent = document.getElementById(`${page}Tab_${category}`);
+            if (targetContent) targetContent.classList.add('active');
+        };
+    </script>
+</body>
+</html>
