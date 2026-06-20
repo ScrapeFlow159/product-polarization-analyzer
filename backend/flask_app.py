@@ -1,13 +1,11 @@
-# flask_app.py - Complete Flask app (2FA)
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+# flask_app.py - Complete Clean Stateless API
+from flask import Flask, request, jsonify, redirect, url_for
 from flask_cors import CORS
 import sqlite3
 import hashlib
 import random
-import smtplib
 import os
-import json
-from email.mime.text import MIMEText
+import requests
 from datetime import datetime, timedelta
 import jwt
 from dotenv import load_dotenv
@@ -16,6 +14,9 @@ load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-key-change-this-in-production")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
+
+# In-memory storage dictionary to track temporary OTP records safely without relying on broken browser session cookies
+OTP_STORE = {}
 
 def create_jwt_token(username, role):
     payload = {
@@ -27,11 +28,11 @@ def create_jwt_token(username, role):
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 app = Flask(__name__)
-CORS(app, origins=["https://product-polarization-analyzer.vercel.app"])
-app.secret_key = os.getenv("SECRET_KEY", "secretkey123")
+
+# Configured to allow Vercel origins to transmit Cross-Origin payloads cleanly
+CORS(app, resources={r"/*": {"origins": "https://product-polarization-analyzer.vercel.app"}})
 
 SENDER_EMAIL = "arobaarif271@gmail.com"
-APP_PASSWORD = "ekrpepzprnyklzry"
 
 def ensure_role_column():
     conn = sqlite3.connect("users.db")
@@ -50,25 +51,18 @@ def ensure_role_column():
             )
         ''')
         conn.commit()
-        print("✅ Users table created successfully")
     else:
         cursor.execute("PRAGMA table_info(users)")
         columns = [col[1] for col in cursor.fetchall()]
         if "role" not in columns:
             cursor.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'User'")
             conn.commit()
-            print("✅ 'role' column added to users table")
-        else:
-            print("ℹ️ 'role' column already exists")
     conn.close()
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 def send_email(to_email, otp):
-    import requests
-    import os
-    
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {
         "api-key": os.getenv("BREVO_API_KEY"),
@@ -82,39 +76,24 @@ def send_email(to_email, otp):
     }
     try:
         response = requests.post(url, json=data, headers=headers)
-        if response.status_code == 201:
-            print("✅ Email sent via Brevo")
-            return True
-        else:
-            print(f"❌ Brevo error: {response.text}")
-            return False
+        return response.status_code == 201
     except Exception as e:
         print(f"❌ Email error: {e}")
         return False
-login_attempts = {}
-
-# ================= FIXED ROUTES =================
 
 @app.route('/')
 def home():
-    # FIXED: Instead of serving a broken index page, route users straight to the registration template or view
-    return redirect(url_for('api_register'))
+    return jsonify({"status": "running", "message": "API Backend is active"}), 200
 
-@app.route('/index.html')
-def serve_index():
-    # FIXED: Route index fallback traffic directly to registration as well
-    return redirect(url_for('api_register'))
-
-@app.route('/api/register', methods=['POST'])
+# Endpoint path standardized with frontend routing syntax
+@app.route('/register', methods=['POST'])
 def api_register():
-    from flask import request, jsonify
-    data = request.json
+    data = request.json or {}
     username = data.get('username')
     email = data.get('email')
     password = data.get('password')
     role = data.get('role', 'User')
     
-    # Validation
     if not all([username, email, password, role]):
         return jsonify({"status": "error", "message": "All fields required"}), 400
     
@@ -127,7 +106,6 @@ def api_register():
     if len(password) < 6:
         return jsonify({"status": "error", "message": "Password must be at least 6 characters"}), 400
     
-    # Save to database
     password_hash = hash_password(password)
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
@@ -142,10 +120,11 @@ def api_register():
         return jsonify({"status": "error", "message": "Username already exists"}), 400
     finally:
         conn.close()
-@app.route('/api/login', methods=['POST'])
+
+# Endpoint path standardized with frontend routing syntax
+@app.route('/login', methods=['POST'])
 def api_login():
-    from flask import request, jsonify, session
-    data = request.json
+    data = request.json or {}
     username = data.get('username')
     password = data.get('password')
     
@@ -166,95 +145,64 @@ def api_login():
     if stored_hash != password_hash:
         return jsonify({"status": "error", "message": "Invalid password"}), 401
     
-    # Generate OTP
     otp = str(random.randint(100000, 999999))
     send_email(email, otp)
     
-    # Store OTP in session
-    session['otp'] = otp
-    session['otp_time'] = datetime.now().isoformat()
-    session['username'] = username
-    session['role'] = role
+    # Store OTP details inside the server context cache mapped directly against their unique username identifier
+    OTP_STORE[username] = {
+        "otp": otp,
+        "expires_at": datetime.now() + timedelta(minutes=5),
+        "role": role
+    }
     
     return jsonify({"status": "success", "message": "OTP sent to your email"}), 200
-@app.route('/api/verify-otp', methods=['POST'])
+
+# Endpoint path standardized with frontend routing syntax
+@app.route('/verify_otp', methods=['POST'])
 def api_verify_otp():
-    from flask import request, jsonify, session
-    data = request.json
+    data = request.json or {}
+    username = data.get('username')
     user_otp = data.get('otp')
     
-    otp = session.get('otp')
-    otp_time_str = session.get('otp_time')
+    if not username or not user_otp:
+        return jsonify({"status": "error", "message": "Missing username or OTP token parameter"}), 400
+        
+    user_record = OTP_STORE.get(username)
     
-    if not otp or not otp_time_str:
-        return jsonify({"status": "error", "message": "OTP expired. Please login again."}), 400
-    
-    otp_time = datetime.fromisoformat(otp_time_str)
-    if datetime.now() > otp_time + timedelta(minutes=2):
-        session.pop('otp', None)
-        session.pop('otp_time', None)
-        return jsonify({"status": "error", "message": "OTP expired. Please request a new one."}), 400
-    
-    if user_otp != otp:
-        return jsonify({"status": "error", "message": "Invalid OTP"}), 400
-    
-    # Generate JWT
-    username = session.get('username')
-    role = session.get('role')
+    if not user_record:
+        return jsonify({"status": "error", "message": "No active verification requests found. Please request a new OTP."}), 400
+        
+    if datetime.now() > user_record["expires_at"]:
+        OTP_STORE.pop(username, None)
+        return jsonify({"status": "error", "message": "OTP has expired. Please re-authenticate."}), 400
+        
+    if user_otp != user_record["otp"]:
+        return jsonify({"status": "error", "message": "Invalid verification token sequence"}), 400
+        
+    role = user_record["role"]
     jwt_token = create_jwt_token(username, role)
     
-    session.pop('otp', None)
-    session.pop('otp_time', None)
+    # Clean up validation token entry
+    OTP_STORE.pop(username, None)
     
     return jsonify({
         "status": "success",
-        "message": "Login successful",
+        "message": "Authentication validation successful",
         "token": jwt_token,
         "username": username,
         "role": role
     }), 200
-@app.route('/dashboard')
-def dashboard():
-    username = session.get('username')
-    role = session.get('role')
-    jwt_token = session.get('jwt_token', '')
-    if not username:
-        # FIXED: Protection logic. If someone isn't logged in, don't let them see the dashboard!
-        return redirect(url_for('register'))
-    return render_template('dashboard.html', username=username, role=role, jwt_token=jwt_token)
 
-@app.route('/api/logout', methods=['POST'])
-def api_logout():
-    from flask import jsonify, session
-    session.clear()
-    return jsonify({"status": "success", "message": "Logged out successfully"}), 200
-# Admin routes
-@app.route('/admin/manage-users')
-def admin_manage_users():
-    username = session.get('username')
-    role = session.get('role')
-    if role != 'Admin':
-        return redirect(url_for('dashboard'))
+@app.route('/api/get-users', methods=['GET'])
+def api_get_users():
+    # Admin API route returning database rows cleanly as arrays
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
     cursor.execute("SELECT id, username, email, role FROM users")
     users = cursor.fetchall()
     conn.close()
-    return render_template('admin_users.html', users=users, username=username)
-
-@app.route('/admin/delete-user/<int:user_id>')
-def admin_delete_user(user_id):
-    role = session.get('role')
-    if role != 'Admin':
-        return redirect(url_for('dashboard'))
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
-    conn.commit()
-    conn.close()
-    flash("User deleted successfully!", "success")
-    return redirect(url_for('admin_manage_users'))
+    return jsonify({"status": "success", "users": users}), 200
 
 if __name__ == "__main__":
     ensure_role_column()
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
