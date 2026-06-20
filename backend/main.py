@@ -40,6 +40,31 @@ import csv
 from io import StringIO
 from fastapi.responses import StreamingResponse
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # ← ALLOW ALL (testing ke liye)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ✅ Manual CORS Middleware (OPTIONS handle)
+@app.middleware("http")
+async def cors_middleware(request: Request, call_next):
+    if request.method == "OPTIONS":
+        response = Response(status_code=200)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, PUT, DELETE"
+        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Origin, X-Requested-With"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        return response
+    
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
+
+
 
 # ✅ Mount Flask app inside FastAPI
 app.mount("/auth", WSGIMiddleware(flask_app))
@@ -195,35 +220,7 @@ async def export_results(
 def test():
     return {"message": "working"}
 
-# ========================================================
-# 🌟 CORSMiddleware & Preflight Control Engine (FINAL FIX)
-# ========================================================
 
-# 1. Standard CORS Layer Configuration
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://product-polarization-analyzer.vercel.app", "http://localhost:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],  # Yeh automatically OPTIONS ko pass karega
-    allow_headers=["*"],  # Yeh saare custom auth headers ko bypass karega
-)
-
-
-@app.middleware("http")
-async def absolute_cors_lock(request: Request, call_next):
-    if request.method == "OPTIONS":
-        response = Response(status_code=200)
-        response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "https://product-polarization-analyzer.vercel.app")
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS, PUT, DELETE"
-        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Origin, X-Requested-With"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        return response
-    
-    response = await call_next(request)
-    # Baaki normal requests ke saath bhi headers force karein taake browser reject na kare
-    response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "https://product-polarization-analyzer.vercel.app")
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    return response
 # Data models
 class Product(BaseModel):
     name: str
