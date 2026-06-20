@@ -1586,23 +1586,33 @@ async function analyzeCustomWeek() {
     resultDiv.innerHTML = '<div style="text-align: center; padding: 20px;"><div class="spinner" style="margin: 0 auto;"></div><p>Analyzing...</p></div>';
     
     try {
-        const response = await fetch(`${API_BASE_URL}/api/analyze-custom`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                platform: platform,
-                category: category,
-                unit: 'days',
-                duration: parseInt(days),
-                max_products: 50
-            })
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
-        const data = await response.json();
+    // URL parameters se security token aur user info read karne ke liye
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token') || localStorage.getItem('token');
+    const username = urlParams.get('username') || localStorage.getItem('username');
+    const role = urlParams.get('role') || localStorage.getItem('role');
+
+    const response = await fetch(`${API_BASE_URL}/api/analyze-custom?username=${username}&role=${role}`, {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}` // Secure connection token header
+        },
+        body: JSON.stringify({
+            platform: platform,
+            category: category,
+            unit: 'days',
+            duration: parseInt(days),
+            max_products: 50
+        })
+    });
+    
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+    }
+
+    
         displayCustomResult(data, 'weekResult');
         
     } catch (error) {
