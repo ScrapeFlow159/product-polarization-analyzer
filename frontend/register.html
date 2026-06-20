@@ -14,6 +14,37 @@
         }
     </style>
 </head>
+<script>
+document.getElementById('registerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = {
+        username: document.querySelector('[name="username"]').value,
+        email: document.querySelector('[name="email"]').value,
+        password: document.querySelector('[name="password"]').value,
+        role: document.querySelector('[name="role"]').value
+    };
+    
+    try {
+        const response = await fetch('https://product-polarization-analyzer-production.up.railway.app/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            alert('✅ ' + data.message);
+            window.location.href = '/login.html';
+        } else {
+            alert('❌ ' + data.message);
+        }
+    } catch (error) {
+        alert('❌ Network error: ' + error.message);
+    }
+});
+</script>
 <body class="d-flex justify-content-center align-items-center">
 
 <div class="card shadow p-4" style="width: 400px;">
