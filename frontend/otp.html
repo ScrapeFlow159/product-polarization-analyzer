@@ -43,36 +43,48 @@ document.getElementById('otpForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const otp = document.querySelector('[name="otp"]').value;
-    const username = localStorage.getItem('username'); // Gets the logged-in username safely
+    
+    // 1. LocalStorage se username nikalna zaroori hai backend ke liye
+    const username = localStorage.getItem('username'); 
+    
+    if (!username) {
+        alert('❌ Session expired or username missing. Please login again.');
+        window.location.href = '/login.html';
+        return;
+    }
     
     try {
+        // Aapka direct Railway live server link
         const response = await fetch('https://product-polarization-analyzer-production.up.railway.app/verify_otp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 otp: otp,
-                username: username // FIXED: Sent together so backend doesn't throw 400
+                username: username // 2. Dono ko ek sath bhejna zaroori hai
             })
         });
         
         const data = await response.json();
         
         if (response.ok || data.status === 'success') {
+            // Sahi credentials ko browser memory mein store karna taake dashboard chal sake
             localStorage.setItem('token', data.token);
-            localStorage.setItem('username', data.username);
-            localStorage.setItem('role', data.role);
+            localStorage.setItem('username', data.username || username);
+            localStorage.setItem('role', data.role || 'User');
+            
             alert('✅ Verification Successful!');
             window.location.href = '/dashboard.html';
         } else {
-            alert('❌ ' + (data.message || 'Verification failed'));
+            alert('❌ ' + (data.message || data.detail || 'Invalid OTP or Token Sequence'));
         }
     } catch (error) {
         alert('❌ Network error: ' + error.message);
     }
 });
 
+// Resend function jo users ko security break kiye baghair back handle karti hai
 document.getElementById('resendBtn').addEventListener('click', () => {
-    alert('ℹ️ To refresh your verification token securely, please run a quick login re-auth.');
+    alert('ℹ️ Security reasons ki wajah se, please login screen se dobara OTP send karein.');
     window.location.href = '/login.html';
 });
 </script>
