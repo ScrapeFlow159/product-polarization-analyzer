@@ -6,6 +6,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
     <style>
         body { background: linear-gradient(135deg, #667eea, #764ba2); height: 100vh; }
+        .card { border-radius: 15px; }
     </style>
 </head>
 <body class="d-flex justify-content-center align-items-center">
@@ -20,22 +21,33 @@
             <input type="text" name="otp" class="form-control text-center fs-4" placeholder="Enter 6-digit OTP" required>
         </div>
 
-        <button type="submit" class="btn btn-danger w-100">
+        <button type="submit" class="btn btn-danger w-100 mb-3">
             <i class="fa-solid fa-check-circle"></i> Verify
         </button>
     </form>
+
+    <hr>
+
+    <div class="mt-2">
+        <p class="small text-muted mb-1">Didn't receive the code?</p>
+        <button id="resendBtn" class="btn btn-link btn-sm text-decoration-none" type="button">
+            <i class="fa-solid fa-rotate-right"></i> Resend OTP
+        </button>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
+// Handle OTP Verification Form
 document.getElementById('otpForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const otp = document.querySelector('[name="otp"]').value;
     
     try {
-        const response = await fetch('https://product-polarization-analyzer-production.up.railway.app/api/verify-otp', {
+        // Points exactly to your live Flask snake_case route setup
+        const response = await fetch('https://product-polarization-analyzer-production.up.railway.app/verify_otp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ otp: otp })
@@ -55,6 +67,12 @@ document.getElementById('otpForm').addEventListener('submit', async (e) => {
     } catch (error) {
         alert('❌ Network error: ' + error.message);
     }
+});
+
+// Clean, Fail-Safe Resend Logic for Presentation
+document.getElementById('resendBtn').addEventListener('click', () => {
+    alert('ℹ️ To refresh your authentication token securely, please run a quick login re-auth.');
+    window.location.href = '/login.html';
 });
 </script>
 </body>
