@@ -64,10 +64,205 @@ async def cors_middleware(request: Request, call_next):
     response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
 
+@app.post("/api/analyze")
+async def analyze_polarization(
+    request: AnalysisRequest,
+    username: str = None,
+    role: str = None
+):
+    """Main analysis endpoint with time-based analysis support"""
+    try:
+        print(f"\n{'='*60}")
+        print(f"🔍 Analyzing {request.platform.upper()} - {request.subcategory}")
+        print(f"   Type: {request.analysis_type}")
+        print(f"   User: {username}, Role: {role}")
+        print(f"{'='*60}")
+        
+        # ========== GET CUSTOM PARAMETERS ==========
+        custom_k = 3
+        weights = {"price": 1.0, "rating": 1.0, "reviews": 1.0, "popularity": 1.0}
+        
+        if role == "Research Analyst" and username and username in research_analyst_params:
+            custom_k = research_analyst_params[username].get("k_value", 3)
+            weights = research_analyst_params[username].get("weights", weights)
+            print(f"📊 USING CUSTOM PARAMETERS: k={custom_k}, weights={weights}")
+        else:
+            print(f"📊 Using DEFAULT parameters")
+        
+        # ========== PLATFORM SELECTION & DATA EXTRACTION ==========
+        if request.platform.lower() == "daraz":
+            subcategory = request.subcategory.lower().replace(" ", "_")
+            if subcategory not in DARAZ_DATASETS:
+                raise HTTPException(status_code=404, detail=f"No CSV found for subcategory: {request.subcategory}")
+            products = extract_daraz_products(subcategory, request.max_products)
+            platform_name = "Daraz.pk"
+            csv_file = f"{subcategory}.csv"
+        elif request.platform.lower() == "etsy":
+            subcategory = request.subcategory.lower().replace(" ", "_")
+            if subcategory not in ETSY_DATASETS:
+                raise HTTPException(status_code=404, detail=f"No CSV found for Etsy subcategory: {request.subcategory}")
+            products = extract_etsy_products(subcategory, request.max_products)
+            platform_name = "Etsy.com"
+            csv_file = f"{subcategory}.csv"
+        else:
+            raise HTTPException(status_code=400, detail="Invalid platform")
+        
+        if not products:
+            raise HTTPException(status_code=404, detail=f"No valid products found")
+        
+        # Debug output
+        print(f"\n🔍 ===== DEBUG for {request.subcategory} =====")
+        print(f"📦 Total products: {len(products)}")
+        if products:
+            prices = [p['price'] for p in products[:10]]
+            ratings = [p['rating'] for p in products[:10]]
+            print(f"💰 Sample prices: {prices[:5]}")
+            print(f"⭐ Sample ratings: {ratings[:5]}")
+        print(f"==========================================\n")
+        
+        # ========== NORMALIZATION & CLUSTERING ==========
+        products = normalize_features(products, weights)
+        n_clusters = min(custom_k, len(products))
+        print(f"📊 Clustering with k={n_clusters}")
+        
+        clustered_products, centers, cluster_labels, sil_score = apply_clustering(products, n_clusters, weights)
+        clustered_products.sort(key=lambda x: x['ranking_score'], reverse=True)
+        
+        # ========== POLARIZATION SCORE ==========
+        polarization_score = calculate_polarization_score(clustered_products, centers, n_clusters)
+        
+        # ========== FOR WEEKLY/MONTHLY: OVERRIDE WITH HISTORICAL AVERAGE ==========
+        if request.analysis_type in ["weekly", "monthly"]:
+            from database import get_daily_snapshots
+            days = 7 if request.analysis_type == "weekly" else 30
+            snapshots = get_daily_snapshots(platform_name, request.subcategory)
+            
+            if snapshots and len(snapshots) >= days:
+                last_n_scores = [s['polarization_score'] for s in snapshots[-days:]]
+                avg_score = sum(last_n_scores) / len(last_n_scores)
+                print(f"📊 {request.analysis_type.upper()} - Using historical average: {avg_score:.4f} (current would be: {polarization_score:.4f})")
+                polarization_score = avg_score
+            else:
+                print(f"⚠️ Not enough historical data for {request.analysis_type} (need {days}, have {len(snapshots) if snapshots else 0})")
+        
+        polarization_level = get_polarization_level(polarization_score)
+        
+        # ========== BUILD CLUSTERS INFO ==========
+        clusters = []
+        for i in range(n_clusters):
+            cluster_products = [p for p in clustered_products if p['cluster'] == i]
+            if cluster_products:
+                avg_price = np.mean([p['price'] for p in cluster_products])
+                avg_rating = np.mean([p['rating'] for p in cluster_products])
+                clusters.append({
+                    "cluster_id": i,
+                    "label": cluster_labels[i],
+                    "size": len(cluster_products),
+                    "avg_price": round(avg_price, 2),
+                    "avg_rating": round(avg_rating, 2),
+                    "percentage": round(len(cluster_products) / len(products) * 100, 1)
+                })
+        
+        # ========== FEATURE IMPORTANCE ==========
+        feature_importance = {
+            "price": round(abs(centers[:, 0].max() - centers[:, 0].min()) * 100, 1),
+            "rating": round(abs(centers[:, 1].max() - centers[:, 1].min()) * 100, 1),
+            "reviews": round(abs(centers[:, 2].max() - centers[:, 2].min()) * 100, 1),
+            "popularity": round(abs(centers[:, 3].max() - centers[:, 3].min()) * 100, 1)
+        }
+        
+        # ========== RESPONSE PRODUCTS ==========
+        response_products = []
+        for p in clustered_products[:20]:
+            response_products.append(Product(
+                name=p['name'],
+                price=p['price'],
+                rating=p['rating'],
+                reviews=p['reviews'],
+                popularity_score=p['popularity'],
+                cluster=p['cluster'],
+                cluster_label=p['cluster_label'],
+                seller=p.get('seller'),
+                brand=p.get('brand')
+            ))
+        
+        result = PolarizationAnalysis(
+            platform=platform_name,
+            total_products=len(products),
+            polarization_score=round(polarization_score, 3),
+            polarization_level=polarization_level,
+            clusters=clusters,
+            products=response_products,
+            feature_importance=feature_importance,
+            analysis_timestamp=datetime.now().isoformat(),
+            data_source=f"CSV - {csv_file}",
+            csv_file_used=csv_file,
+            silhouette_score=round(sil_score, 4),
+            analysis_type=request.analysis_type
+        )
+        
+        # ========== SAVE TO DATABASE ==========
+        if request.save_to_db:
+            save_analysis_result(
+                platform=platform_name,
+                category=request.subcategory,
+                analysis_type=request.analysis_type,
+                analysis_date=datetime.now(),
+                total_products=len(products),
+                polarization_score=polarization_score,
+                polarization_level=polarization_level,
+                silhouette_score=sil_score,
+                clusters=clusters,
+                feature_importance=feature_importance,
+                top_products=[p.model_dump() for p in response_products]
+            )
+            
+            avg_price = np.mean([p.price for p in response_products[:10]])
+            avg_rating = np.mean([p.rating for p in response_products[:10]])
+            cluster_dist = {c['label']: c['size'] for c in clusters}
+            
+            save_time_snapshot(
+                platform=platform_name,
+                category=request.subcategory,
+                snapshot_type=request.analysis_type,
+                snapshot_date=datetime.now(),
+                polarization_score=polarization_score,
+                total_products=len(products),
+                avg_price=round(avg_price, 2),
+                avg_rating=round(avg_rating, 2),
+                cluster_distribution=cluster_dist
+            )
+            
+            save_daily_snapshot(
+                platform=platform_name,
+                category=request.subcategory,
+                snapshot_date=datetime.now().date(),
+                polarization_score=polarization_score,
+                total_products=len(products)
+            )
+            print(f"✅ Daily snapshot saved: {platform_name}/{request.subcategory}")
+        
+        print(f"✅ Analysis complete! Polarization Score: {polarization_score}")
+        return result.model_dump()
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-# ✅ Mount Flask app inside FastAPI
+@app.get("/test")
+def test():
+    return {"message": "working"}
+
+
+
+# ✅ THEN mount Flask app
 app.mount("/auth", WSGIMiddleware(flask_app))
+
+
 
 # Serve static files (frontend)
 frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
@@ -215,10 +410,6 @@ async def export_results(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
-@app.get("/test")
-def test():
-    return {"message": "working"}
 
 
 # Data models
@@ -897,193 +1088,7 @@ async def calculate_from_csv(platform, category):
     }
 
 
-@app.post("/api/analyze")
-async def analyze_polarization(
-    request: AnalysisRequest,
-    username: str = None,
-    role: str = None
-):
-    """Main analysis endpoint with time-based analysis support"""
-    try:
-        print(f"\n{'='*60}")
-        print(f"🔍 Analyzing {request.platform.upper()} - {request.subcategory}")
-        print(f"   Type: {request.analysis_type}")
-        print(f"   User: {username}, Role: {role}")
-        print(f"{'='*60}")
-        
-        # ========== GET CUSTOM PARAMETERS ==========
-        custom_k = 3
-        weights = {"price": 1.0, "rating": 1.0, "reviews": 1.0, "popularity": 1.0}
-        
-        if role == "Research Analyst" and username and username in research_analyst_params:
-            custom_k = research_analyst_params[username].get("k_value", 3)
-            weights = research_analyst_params[username].get("weights", weights)
-            print(f"📊 USING CUSTOM PARAMETERS: k={custom_k}, weights={weights}")
-        else:
-            print(f"📊 Using DEFAULT parameters")
-        
-        # ========== PLATFORM SELECTION & DATA EXTRACTION ==========
-        if request.platform.lower() == "daraz":
-            subcategory = request.subcategory.lower().replace(" ", "_")
-            if subcategory not in DARAZ_DATASETS:
-                raise HTTPException(status_code=404, detail=f"No CSV found for subcategory: {request.subcategory}")
-            products = extract_daraz_products(subcategory, request.max_products)
-            platform_name = "Daraz.pk"
-            csv_file = f"{subcategory}.csv"
-        elif request.platform.lower() == "etsy":
-            subcategory = request.subcategory.lower().replace(" ", "_")
-            if subcategory not in ETSY_DATASETS:
-                raise HTTPException(status_code=404, detail=f"No CSV found for Etsy subcategory: {request.subcategory}")
-            products = extract_etsy_products(subcategory, request.max_products)
-            platform_name = "Etsy.com"
-            csv_file = f"{subcategory}.csv"
-        else:
-            raise HTTPException(status_code=400, detail="Invalid platform")
-        
-        if not products:
-            raise HTTPException(status_code=404, detail=f"No valid products found")
-        
-        # Debug output
-        print(f"\n🔍 ===== DEBUG for {request.subcategory} =====")
-        print(f"📦 Total products: {len(products)}")
-        if products:
-            prices = [p['price'] for p in products[:10]]
-            ratings = [p['rating'] for p in products[:10]]
-            print(f"💰 Sample prices: {prices[:5]}")
-            print(f"⭐ Sample ratings: {ratings[:5]}")
-        print(f"==========================================\n")
-        
-        # ========== NORMALIZATION & CLUSTERING ==========
-        products = normalize_features(products, weights)
-        n_clusters = min(custom_k, len(products))
-        print(f"📊 Clustering with k={n_clusters}")
-        
-        clustered_products, centers, cluster_labels, sil_score = apply_clustering(products, n_clusters, weights)
-        clustered_products.sort(key=lambda x: x['ranking_score'], reverse=True)
-        
-        # ========== POLARIZATION SCORE ==========
-        polarization_score = calculate_polarization_score(clustered_products, centers, n_clusters)
-        
-        # ========== FOR WEEKLY/MONTHLY: OVERRIDE WITH HISTORICAL AVERAGE ==========
-        if request.analysis_type in ["weekly", "monthly"]:
-            from database import get_daily_snapshots
-            days = 7 if request.analysis_type == "weekly" else 30
-            snapshots = get_daily_snapshots(platform_name, request.subcategory)
-            
-            if snapshots and len(snapshots) >= days:
-                last_n_scores = [s['polarization_score'] for s in snapshots[-days:]]
-                avg_score = sum(last_n_scores) / len(last_n_scores)
-                print(f"📊 {request.analysis_type.upper()} - Using historical average: {avg_score:.4f} (current would be: {polarization_score:.4f})")
-                polarization_score = avg_score
-            else:
-                print(f"⚠️ Not enough historical data for {request.analysis_type} (need {days}, have {len(snapshots) if snapshots else 0})")
-        
-        polarization_level = get_polarization_level(polarization_score)
-        
-        # ========== BUILD CLUSTERS INFO ==========
-        clusters = []
-        for i in range(n_clusters):
-            cluster_products = [p for p in clustered_products if p['cluster'] == i]
-            if cluster_products:
-                avg_price = np.mean([p['price'] for p in cluster_products])
-                avg_rating = np.mean([p['rating'] for p in cluster_products])
-                clusters.append({
-                    "cluster_id": i,
-                    "label": cluster_labels[i],
-                    "size": len(cluster_products),
-                    "avg_price": round(avg_price, 2),
-                    "avg_rating": round(avg_rating, 2),
-                    "percentage": round(len(cluster_products) / len(products) * 100, 1)
-                })
-        
-        # ========== FEATURE IMPORTANCE ==========
-        feature_importance = {
-            "price": round(abs(centers[:, 0].max() - centers[:, 0].min()) * 100, 1),
-            "rating": round(abs(centers[:, 1].max() - centers[:, 1].min()) * 100, 1),
-            "reviews": round(abs(centers[:, 2].max() - centers[:, 2].min()) * 100, 1),
-            "popularity": round(abs(centers[:, 3].max() - centers[:, 3].min()) * 100, 1)
-        }
-        
-        # ========== RESPONSE PRODUCTS ==========
-        response_products = []
-        for p in clustered_products[:20]:
-            response_products.append(Product(
-                name=p['name'],
-                price=p['price'],
-                rating=p['rating'],
-                reviews=p['reviews'],
-                popularity_score=p['popularity'],
-                cluster=p['cluster'],
-                cluster_label=p['cluster_label'],
-                seller=p.get('seller'),
-                brand=p.get('brand')
-            ))
-        
-        result = PolarizationAnalysis(
-            platform=platform_name,
-            total_products=len(products),
-            polarization_score=round(polarization_score, 3),
-            polarization_level=polarization_level,
-            clusters=clusters,
-            products=response_products,
-            feature_importance=feature_importance,
-            analysis_timestamp=datetime.now().isoformat(),
-            data_source=f"CSV - {csv_file}",
-            csv_file_used=csv_file,
-            silhouette_score=round(sil_score, 4),
-            analysis_type=request.analysis_type
-        )
-        
-        # ========== SAVE TO DATABASE ==========
-        if request.save_to_db:
-            save_analysis_result(
-                platform=platform_name,
-                category=request.subcategory,
-                analysis_type=request.analysis_type,
-                analysis_date=datetime.now(),
-                total_products=len(products),
-                polarization_score=polarization_score,
-                polarization_level=polarization_level,
-                silhouette_score=sil_score,
-                clusters=clusters,
-                feature_importance=feature_importance,
-                top_products=[p.model_dump() for p in response_products]
-            )
-            
-            avg_price = np.mean([p.price for p in response_products[:10]])
-            avg_rating = np.mean([p.rating for p in response_products[:10]])
-            cluster_dist = {c['label']: c['size'] for c in clusters}
-            
-            save_time_snapshot(
-                platform=platform_name,
-                category=request.subcategory,
-                snapshot_type=request.analysis_type,
-                snapshot_date=datetime.now(),
-                polarization_score=polarization_score,
-                total_products=len(products),
-                avg_price=round(avg_price, 2),
-                avg_rating=round(avg_rating, 2),
-                cluster_distribution=cluster_dist
-            )
-            
-            save_daily_snapshot(
-                platform=platform_name,
-                category=request.subcategory,
-                snapshot_date=datetime.now().date(),
-                polarization_score=polarization_score,
-                total_products=len(products)
-            )
-            print(f"✅ Daily snapshot saved: {platform_name}/{request.subcategory}")
-        
-        print(f"✅ Analysis complete! Polarization Score: {polarization_score}")
-        return result.model_dump()
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/comparison/{platform}/{category}")
 async def get_comparison(platform: str, category: str):
     """Get comparison between current, weekly, and monthly polarization"""
