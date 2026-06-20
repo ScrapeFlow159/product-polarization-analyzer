@@ -946,27 +946,108 @@
             <p class="subtitle">Multi-Category Analysis | Current | Weekly | Monthly Trends with Difference Comparison</p>
         </div>
 
-        <script>
-            // Get token from URL and store in localStorage
-            const urlParams = new URLSearchParams(window.location.search);
-            const token = urlParams.get('token');
-            const username = urlParams.get('username');
-            const role = urlParams.get('role');
-            
-            console.log("🔍 Index page loaded");
-            console.log("Token from URL:", token);
-            
-            if (token && token !== "" && token !== "null") {
-                localStorage.setItem('jwt_token', token);
-                console.log("✅ JWT Token stored in localStorage from index.html");
-                console.log("📦 Token:", token.substring(0, 50) + "...");
-            } else {
-                console.log("❌ No token found in URL");
-            }
-            
-            if (username) localStorage.setItem('username', username);
-            if (role) localStorage.setItem('role', role);
-        </script>
+        <script>// ==========================================
+// 1. CONFIGURATIONS & GLOBAL VARIABLES
+// ==========================================
+const API_BASE_URL = 'https://product-polarization-analyzer-production.up.railway.app';
+
+// Token keys sync matching with otp.html
+const urlParams = new URLSearchParams(window.location.search);
+const token = urlParams.get('token') || localStorage.getItem('token') || localStorage.getItem('jwt_token');
+const username = urlParams.get('username') || localStorage.getItem('username') || 'Guest';
+const role = urlParams.get('role') || localStorage.getItem('role') || 'Role';
+
+// Update LocalStorage keys to keep everything clean
+if (urlParams.get('token')) localStorage.setItem('token', urlParams.get('token'));
+if (urlParams.get('username')) localStorage.setItem('username', urlParams.get('username'));
+if (urlParams.get('role')) localStorage.setItem('role', urlParams.get('role'));
+
+// Dynamic UI Info update
+document.getElementById('username').innerText = username;
+document.getElementById('userRole').innerText = role;
+
+// Session Expiry Safeguard
+if (!token || token === "null") {
+    alert('Session expired or unauthorized access. Please login via OTP verification.');
+    window.location.href = '/login.html';
+}
+
+// ==========================================
+// 2. FIXED ANALYZE FUNCTION WORKFLOW
+// ==========================================
+async function analyzeCurrentPolarization(selectedCategories, platform) {
+    if (!selectedCategories || selectedCategories.length === 0) {
+        alert("Please select at least one category.");
+        return;
+    }
+
+    // Loader controls toggle
+    const loadingContainer = document.getElementById('currentLoadingContainer');
+    if (loadingContainer) loadingContainer.style.display = 'block';
+    
+    resetSteps('current');
+    updateStep('current', 1, 'active');
+
+    try {
+        // Step 1: Loading/Triggering Backend API call
+        const response = await fetch(`${API_BASE_URL}/api/analyze-custom?username=${username}&role=${role}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                platform: platform,
+                category: selectedCategories[0], // Sending the primary category context
+                unit: 'days',
+                duration: 7,
+                max_products: 50
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.detail || `Server responded with status ${response.status}`);
+        }
+
+        updateStep('current', 1, 'completed');
+        updateStep('current', 2, 'active');
+        
+        const data = await response.json();
+        
+        updateStep('current', 2, 'completed');
+        updateStep('current', 3, 'completed');
+        updateStep('current', 4, 'completed');
+
+        // Dynamic results handling injector
+        if (typeof renderAnalysisResults === 'function') {
+            renderAnalysisResults(data);
+        } else {
+            console.log("Data successfully received:", data);
+            alert("✅ Polarization analysis loaded successfully!");
+        }
+
+    } catch (error) {
+        console.error("Fetch Exception caught:", error);
+        alert("❌ Analyze Polarization Failed: " + error.message + "\nCheck browser Console tab (F12) for network context.");
+    } finally {
+        if (loadingContainer) loadingContainer.style.display = 'none';
+    }
+}
+
+// Helper function definitions just in case they are referenced dynamically by steps UI
+function updateStep(page, stepNum, status) {
+    const stepEl = document.getElementById(`${page}Step${stepNum}`);
+    if (stepEl) {
+        stepEl.className = `step ${status}`;
+    }
+}
+function resetSteps(page) {
+    for(let i=1; i<=4; i++) {
+        const stepEl = document.getElementById(`${page}Step${i}`);
+        if (stepEl) stepEl.className = 'step';
+    }
+}</script>
         <!-- User Info Bar -->
 <div class="user-info-bar" style="background: white; border-radius: 10px; padding: 10px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
     <div>
@@ -1282,7 +1363,7 @@ function closeModal() {
 
     <script>
         // Railway backend URL (Vercel se alag)
-const API_BASE_URL = 'https://product-polarization-analyzer-production.up.railway.app/register';
+
         
         const AVAILABLE_CATEGORIES = {
             daraz: ['Earpods', 'Powerbanks', 'Mobile phone accessories', 'Gaming accessories', 'Smart watches'],
