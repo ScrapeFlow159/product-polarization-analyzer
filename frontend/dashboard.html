@@ -434,7 +434,7 @@ async function saveParameters() {
     
     try {
         // FIXED: Cleaned root path endpoints
-        const response = await fetch(`${API_URL}/api/set-params?username=${username}&role=${role}`, {
+        const response = await fetch(`${API_URL}/set-params?username=${username}&role=${role}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(params)
