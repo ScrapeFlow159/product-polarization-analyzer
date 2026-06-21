@@ -127,12 +127,14 @@ def api_register():
 @app.route('/login', methods=['POST'])
 def api_login():
     data = request.json or {}
-    username = data.get('username').strip().lower() 
-    password = data.get('password')
+    username = data.get('username', '').strip().lower() 
+    password = data.get('password', '')
     
+    # ✅ Validation
     if not username or not password:
         return jsonify({"status": "error", "message": "Username and password required"}), 400
     
+    # ✅ Check user in database
     password_hash = hash_password(password)
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
@@ -144,22 +146,37 @@ def api_login():
         return jsonify({"status": "error", "message": "User not found"}), 404
     
     stored_hash, email, role = result
+    
     if stored_hash != password_hash:
         return jsonify({"status": "error", "message": "Invalid password"}), 401
     
+    # ✅ Check if OTP already exists and not expired (PREVENT DUPLICATE)
+    existing_otp = OTP_STORE.get(username)
+    if existing_otp and datetime.utcnow() < existing_otp["expires_at"]:
+        # OTP already active, don't generate new one
+        return jsonify({
+            "status": "success", 
+            "message": "OTP already sent to your email. Please check your inbox."
+        }), 200
+    
+    # ✅ Generate new OTP
     otp = str(random.randint(100000, 999999))
     send_email(email, otp)
     
-    # Store OTP details inside the server context cache mapped directly against their unique username identifier
+    # ✅ Store OTP
     OTP_STORE[username] = {
         "otp": otp,
-        "expires_at": datetime.utcnow() + timedelta(minutes=10) , # ← Use UTC
+        "expires_at": datetime.utcnow() + timedelta(minutes=10),
         "role": role
     }
     
+    print(f"🔑 NEW OTP for {username}: {otp} (expires at {OTP_STORE[username]['expires_at']})")
+    print(f"📦 OTP Store: {OTP_STORE}")
     
-    return jsonify({"status": "success", "message": "OTP sent to your email"}), 200
-
+    return jsonify({
+        "status": "success", 
+        "message": "OTP sent to your email"
+    }), 200
 # Endpoint path standardized with frontend routing syntax
 @app.route('/verify_otp', methods=['POST'])
 def api_verify_otp():
@@ -195,6 +212,39 @@ def api_verify_otp():
         "username": username,
         "role": role
     }), 200
+
+
+@app.route('/resend_otp', methods=['POST'])
+def api_resend_otp():
+    data = request.json or {}
+    username = data.get('username', '').strip().lower()
+    
+    if not username:
+        return jsonify({"status": "error", "message": "Username required"}), 400
+    
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT email, role FROM users WHERE username = ?", (username,))
+    result = cursor.fetchone()
+    conn.close()
+    
+    if not result:
+        return jsonify({"status": "error", "message": "User not found"}), 404
+    
+    email, role = result
+    
+    otp = str(random.randint(100000, 999999))
+    send_email(email, otp)
+    
+    OTP_STORE[username] = {
+        "otp": otp,
+        "expires_at": datetime.utcnow() + timedelta(minutes=10),
+        "role": role
+    }
+    
+    print(f"🔄 RESEND OTP for {username}: {otp}")
+    
+    return jsonify({"status": "success", "message": "New OTP sent to your email"}), 200
 
 @app.route('/api/get-users', methods=['GET'])
 def api_get_users():

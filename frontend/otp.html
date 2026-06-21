@@ -43,49 +43,79 @@ document.getElementById('otpForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const otp = document.querySelector('[name="otp"]').value;
-    
-    // 1. LocalStorage se username nikalna zaroori hai backend ke liye
-    const username = localStorage.getItem('username'); 
+    const username = localStorage.getItem('username');
+    const submitBtn = document.querySelector('button[type="submit"]');
+    const spinner = document.getElementById('loadingSpinner');
     
     if (!username) {
-        alert('❌ Session expired or username missing. Please login again.');
+        alert('❌ Session expired. Please login again.');
         window.location.href = '/login.html';
         return;
     }
     
+    // Show loading
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Verifying...';
+    spinner.style.display = 'block';
+    
     try {
-        // Aapka direct Railway live server link
         const response = await fetch('https://product-polarization-analyzer-production.up.railway.app/auth/verify_otp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 otp: otp,
-                username: username // 2. Dono ko ek sath bhejna zaroori hai
+                username: username
             })
         });
         
         const data = await response.json();
         
         if (response.ok || data.status === 'success') {
-            // Sahi credentials ko browser memory mein store karna taake dashboard chal sake
             localStorage.setItem('token', data.token);
             localStorage.setItem('username', data.username || username);
             localStorage.setItem('role', data.role || 'User');
-            
-            alert('✅ Verification Successful!');
             window.location.href = '/dashboard.html';
         } else {
-            alert('❌ ' + (data.message || data.detail || 'Invalid OTP or Token Sequence'));
+            alert('❌ ' + (data.message || data.detail || 'Invalid OTP'));
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fa-solid fa-check-circle"></i> Verify';
+            spinner.style.display = 'none';
+        }
+    } catch (error) {
+        alert('❌ Network error: ' + error.message);
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-check-circle"></i> Verify';
+        spinner.style.display = 'none';
+    }
+});
+
+// ✅ YEH RESEND BUTTON HANDLER — ADD/REPLACE THIS
+document.getElementById('resendBtn').addEventListener('click', async () => {
+    const username = localStorage.getItem('username');
+    
+    if (!username) {
+        alert('❌ Please login again.');
+        window.location.href = '/login.html';
+        return;
+    }
+    
+    try {
+        const response = await fetch('https://product-polarization-analyzer-production.up.railway.app/auth/resend_otp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: username })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert('✅ ' + data.message);
+        } else {
+            alert('❌ ' + (data.message || 'Failed to resend OTP'));
         }
     } catch (error) {
         alert('❌ Network error: ' + error.message);
     }
-});
-
-// Resend function jo users ko security break kiye baghair back handle karti hai
-document.getElementById('resendBtn').addEventListener('click', () => {
-    alert('ℹ️ Security reasons ki wajah se, please login screen se dobara OTP send karein.');
-    window.location.href = '/login.html';
 });
 </script>
 </body>
