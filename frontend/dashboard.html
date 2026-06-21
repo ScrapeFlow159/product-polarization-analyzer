@@ -456,7 +456,7 @@ async function saveParameters() {
 async function loadParameters() {
     try {
         // FIXED: Cleaned root path endpoints
-        const response = await fetch(`${API_URL}/get-params?username=${username}&role=${role}`);
+        const response = await fetch(`${API_URL}/api/get-params?username=${username}&role=${role}`);
         const params = await response.json();
         
         document.getElementById('kValue').value = params.k_value || 3;
