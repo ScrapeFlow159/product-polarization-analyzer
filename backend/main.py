@@ -684,15 +684,40 @@ async def get_parameters(username: str = None, role: str = None):
 
 
 @app.post("/api/set-params")
-async def set_parameters(params: AnalysisParams):
+async def set_parameters(
+    params: AnalysisParams,
+    username: str = None,
+    role: str = None
+):
     """Set analysis parameters for Research Analyst"""
-    global analysis_params
+    global analysis_params, research_analyst_params
+    
+    print(f"📊 Set params called: username={username}, role={role}")
+    
     analysis_params["k_value"] = params.k_value
     analysis_params["weights"]["price"] = params.price_weight
     analysis_params["weights"]["rating"] = params.rating_weight
     analysis_params["weights"]["reviews"] = params.reviews_weight
     analysis_params["weights"]["popularity"] = params.popularity_weight
-    return {"message": "Parameters updated successfully", "params": analysis_params}
+    
+    # ✅ Store for specific user if Research Analyst
+    if role == "Research Analyst" and username:
+        research_analyst_params[username] = {
+            "k_value": params.k_value,
+            "weights": {
+                "price": params.price_weight,
+                "rating": params.rating_weight,
+                "reviews": params.reviews_weight,
+                "popularity": params.popularity_weight
+            }
+        }
+        print(f"✅ Stored custom params for {username}")
+    
+    return {
+        "status": "success",
+        "message": "Parameters updated successfully",
+        "params": analysis_params
+    }
 # Global variables for CSV data
 DARAZ_DATASETS = {}
 ETSY_DATASETS = {}
