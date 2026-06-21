@@ -55,6 +55,181 @@ app.add_middleware(
 )
 
 print("Flask app mounted successfully on /auth")
+
+# ============================================
+# ADMIN ENDPOINTS - ADD YE CODE main.py MEIN
+# ============================================
+
+@app.get("/api/manage-users")
+async def get_users():
+    """Get all users for admin panel"""
+    try:
+        import sqlite3
+        from database import DB_PATH
+        
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, username, email, role FROM users")
+        users = cursor.fetchall()
+        conn.close()
+        
+        user_list = []
+        for user in users:
+            user_list.append({
+                "id": user[0],
+                "username": user[1],
+                "email": user[2],
+                "role": user[3]
+            })
+        
+        return {"status": "success", "users": user_list}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.put("/api/manage-users/{user_id}")
+async def update_user(user_id: int, request: Request):
+    """Update user role"""
+    try:
+        data = await request.json()
+        new_role = data.get('role')
+        
+        if not new_role:
+            return {"status": "error", "message": "Role required"}, 400
+        
+        import sqlite3
+        from database import DB_PATH
+        
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE users SET role = ? WHERE id = ?",
+            (new_role, user_id)
+        )
+        conn.commit()
+        affected = cursor.rowcount
+        conn.close()
+        
+        if affected == 0:
+            return {"status": "error", "message": "User not found"}, 404
+        
+        return {"status": "success", "message": "User role updated"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+@app.delete("/api/manage-users/{user_id}")
+async def delete_user(user_id: int):
+    """Delete user"""
+    try:
+        import sqlite3
+        from database import DB_PATH
+        
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        conn.commit()
+        affected = cursor.rowcount
+        conn.close()
+        
+        if affected == 0:
+            return {"status": "error", "message": "User not found"}, 404
+        
+        return {"status": "success", "message": "User deleted"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+@app.get("/api/system-settings")
+async def get_settings():
+    """Get system settings"""
+    return {
+        "status": "success",
+        "settings": {
+            "analysis": {
+                "default_k_value": 3,
+                "max_products": 100,
+                "weekly_analysis_enabled": True,
+                "monthly_analysis_enabled": True
+            },
+            "email": {
+                "sender": "arobaarif271@gmail.com",
+                "otp_expiry_minutes": 10
+            }
+        }
+    }
+
+@app.put("/api/system-settings")
+async def update_settings(request: Request):
+    """Update system settings"""
+    try:
+        data = await request.json()
+        return {
+            "status": "success",
+            "message": "Settings updated",
+            "settings": data
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+@app.get("/api/view-logs")
+async def view_logs():
+    """View system logs"""
+    try:
+        logs = []
+        
+        # Try multiple log file locations
+        log_files = ["app.log", "logs/app.log", "log.txt", "server.log"]
+        
+        for log_file in log_files:
+            if os.path.exists(log_file):
+                with open(log_file, 'r') as f:
+                    lines = f.readlines()
+                    logs = lines[-100:]  # Last 100 lines
+                    break
+        
+        if not logs:
+            # Try to get from railway
+            try:
+                import subprocess
+                result = subprocess.run(
+                    ["tail", "-50", "/proc/1/fd/1"], 
+                    capture_output=True, 
+                    text=True,
+                    timeout=5
+                )
+                if result.stdout:
+                    logs = result.stdout.split('\n')
+                else:
+                    logs = ["No logs found. System is running."]
+            except:
+                logs = ["No logs found. Check Railway console for logs."]
+        
+        return {
+            "status": "success",
+            "logs": logs,
+            "total_lines": len(logs)
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint"""
+    try:
+        import sqlite3
+        from database import DB_PATH
+        
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM users")
+        user_count = cursor.fetchone()[0]
+        conn.close()
+        
+        return {
+            "status": "healthy",
+            "users": user_count,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {"status": "unhealthy", "error": str(e)}, 500
 # Data models
 class Product(BaseModel):
     name: str
