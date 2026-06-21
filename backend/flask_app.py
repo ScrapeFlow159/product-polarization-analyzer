@@ -91,7 +91,7 @@ def home():
 @app.route('/register', methods=['POST'])
 def api_register():
     data = request.json or {}
-    username = data.get('username')
+    username = data.get('username').strip().lower() 
     email = data.get('email')
     password = data.get('password')
     role = data.get('role', 'User')
@@ -127,7 +127,7 @@ def api_register():
 @app.route('/login', methods=['POST'])
 def api_login():
     data = request.json or {}
-    username = data.get('username')
+    username = data.get('username').strip().lower() 
     password = data.get('password')
     
     if not username or not password:
@@ -163,7 +163,7 @@ def api_login():
 @app.route('/verify_otp', methods=['POST'])
 def api_verify_otp():
     data = request.json or {}
-    username = data.get('username')
+    username = data.get('username').strip().lower() 
     user_otp = data.get('otp')
     
     if not username or not user_otp:
