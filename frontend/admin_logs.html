@@ -8,6 +8,7 @@
         body {
             background: linear-gradient(135deg, #667eea, #764ba2);
             min-height: 100vh;
+            padding: 20px;
         }
         .btn-gradient {
             background: linear-gradient(135deg, #667eea, #764ba2);
@@ -38,33 +39,21 @@
             justify-content: space-between;
             align-items: center;
         }
-        .log-entry:hover {
-            background: #f8f9fa;
-        }
+        .log-entry:hover { background: #f8f9fa; }
         .log-info { border-left: 3px solid #17a2b8; }
         .log-error { border-left: 3px solid #dc3545; }
         .log-warning { border-left: 3px solid #ffc107; }
         .log-success { border-left: 3px solid #28a745; }
-        .loading-spinner {
-            text-align: center;
-            padding: 40px;
-        }
-        .log-time {
-            color: #6c757d;
-            font-size: 12px;
-            min-width: 160px;
-        }
+        .loading-spinner { text-align: center; padding: 40px; }
+        .log-time { color: #6c757d; font-size: 12px; min-width: 160px; }
     </style>
 </head>
 <body>
 
-<div class="container mt-4">
+<div class="container">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="text-white"><i class="fas fa-history"></i> System Logs</h2>
         <div>
-            <button class="btn-gradient me-2" onclick="clearLogs()">
-                <i class="fas fa-trash-alt"></i> Clear All Logs
-            </button>
             <button class="btn-gradient me-2" onclick="refreshLogs()">
                 <i class="fas fa-sync"></i> Refresh
             </button>
@@ -75,7 +64,7 @@
     </div>
 
     <div class="logs-container">
-        <h5><i class="fas fa-list"></i> Recent Activity (Last 100 logs)</h5>
+        <h5><i class="fas fa-list"></i> Recent Activity</h5>
         
         <div id="loadingSpinner" class="loading-spinner">
             <div class="spinner-border text-primary" role="status">
@@ -85,9 +74,7 @@
         </div>
         
         <div id="logsList" style="display: none;">
-            <div class="mt-3" id="logsContainer">
-                <!-- Logs will be loaded here -->
-            </div>
+            <div class="mt-3" id="logsContainer"></div>
         </div>
         
         <div id="errorMessage" class="alert alert-danger mt-3" style="display: none;">
@@ -104,10 +91,8 @@
 
 <script>
 const API_BASE = 'https://product-polarization-analyzer-production.up.railway.app';
+let refreshInterval = null;
 
-// ============================================
-// LOAD LOGS
-// ============================================
 async function loadLogs() {
     document.getElementById('loadingSpinner').style.display = 'block';
     document.getElementById('logsList').style.display = 'none';
@@ -115,32 +100,23 @@ async function loadLogs() {
     document.getElementById('emptyMessage').style.display = 'none';
     
     try {
-        // ✅ CORRECT URL
         const response = await fetch(`${API_BASE}/api/view-logs`);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
         const data = await response.json();
         
         if (data.status === 'success') {
-            displayLogs(data.logs);
+            displayLogs(data.logs || []);
             document.getElementById('logsList').style.display = 'block';
         } else {
             showError(data.message || 'Failed to load logs');
         }
     } catch (error) {
-        console.error('Error loading logs:', error);
+        console.error('Error:', error);
         showError(error.message || 'Network error. Please try again.');
     } finally {
         document.getElementById('loadingSpinner').style.display = 'none';
     }
 }
 
-// ============================================
-// DISPLAY LOGS
-// ============================================
 function displayLogs(logs) {
     const container = document.getElementById('logsContainer');
     container.innerHTML = '';
@@ -152,90 +128,43 @@ function displayLogs(logs) {
     
     logs.forEach(log => {
         const div = document.createElement('div');
-        
-        // Determine log type
         let logType = 'info';
         let badgeClass = 'bg-info';
         let logClass = 'log-info';
+        const lower = log.toLowerCase();
         
-        const logLower = log.toLowerCase();
-        if (logLower.includes('error') || logLower.includes('fail') || logLower.includes('exception')) {
+        if (lower.includes('error') || lower.includes('fail')) {
             logType = 'error';
             badgeClass = 'bg-danger';
             logClass = 'log-error';
-        } else if (logLower.includes('warning') || logLower.includes('warn')) {
+        } else if (lower.includes('warning')) {
             logType = 'warning';
             badgeClass = 'bg-warning';
             logClass = 'log-warning';
-        } else if (logLower.includes('success') || logLower.includes('complete') || logLower.includes('✅')) {
+        } else if (lower.includes('success') || lower.includes('✅')) {
             logType = 'success';
             badgeClass = 'bg-success';
             logClass = 'log-success';
         }
         
-        // Extract timestamp if present
-        let timestamp = '';
-        let logText = log;
-        const timeMatch = log.match(/^\[(.*?)\]/);
-        if (timeMatch) {
-            timestamp = timeMatch[1];
-            logText = log.replace(/^\[.*?\]\s*/, '');
-        } else {
-            timestamp = new Date().toLocaleTimeString();
-        }
-        
+        const timestamp = new Date().toLocaleTimeString();
         div.className = `log-entry ${logClass}`;
         div.innerHTML = `
             <span>
                 <span class="badge ${badgeClass}">${logType.toUpperCase()}</span>
-                <span class="ms-2">${logText}</span>
+                <span class="ms-2">${log}</span>
             </span>
-            <span class="log-time">
-                <i class="far fa-clock"></i> ${timestamp}
-            </span>
+            <span class="log-time"><i class="far fa-clock"></i> ${timestamp}</span>
         `;
         container.appendChild(div);
     });
 }
 
-// ============================================
-// CLEAR LOGS
-// ============================================
-async function clearLogs() {
-    if (!confirm('⚠️ Are you sure you want to clear all logs? This action cannot be undone!')) {
-        return;
-    }
-    
-    try {
-        // ✅ CORRECT URL (if you implement clear endpoint)
-        // For now, just reload
-        alert('✅ Logs cleared successfully!');
-        loadLogs();
-    } catch (error) {
-        console.error('Error clearing logs:', error);
-        alert('❌ Error clearing logs. Please try again.');
-    }
-}
-
-// ============================================
-// REFRESH LOGS
-// ============================================
-function refreshLogs() {
-    loadLogs();
-}
-
-// ============================================
-// SHOW ERROR
-// ============================================
-function showError(message) {
-    document.getElementById('errorText').textContent = message;
+function refreshLogs() { loadLogs(); }
+function showError(msg) {
+    document.getElementById('errorText').textContent = msg;
     document.getElementById('errorMessage').style.display = 'block';
 }
-
-// ============================================
-// AUTO-REFRESH LOGS (every 30 seconds)
-// ============================================
-let refreshInterval = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     if (!localStorage.getItem('token')) {
@@ -243,16 +172,11 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     loadLogs();
-    
-    // Auto-refresh every 30 seconds
     refreshInterval = setInterval(loadLogs, 30000);
 });
 
-// Clear interval on page unload
 window.addEventListener('beforeunload', function() {
-    if (refreshInterval) {
-        clearInterval(refreshInterval);
-    }
+    if (refreshInterval) clearInterval(refreshInterval);
 });
 </script>
 </body>

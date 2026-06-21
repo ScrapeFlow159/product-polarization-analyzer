@@ -8,6 +8,7 @@
         body {
             background: linear-gradient(135deg, #667eea, #764ba2);
             min-height: 100vh;
+            padding: 20px;
         }
         .btn-gradient {
             background: linear-gradient(135deg, #667eea, #764ba2);
@@ -40,11 +41,15 @@
         .role-research { background: #ffc107; color: black; }
         .role-evaluator { background: #17a2b8; color: white; }
         .role-user { background: #6c757d; color: white; }
+        .loading-spinner {
+            text-align: center;
+            padding: 40px;
+        }
     </style>
 </head>
 <body>
 
-<div class="container mt-4">
+<div class="container">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="text-white"><i class="fas fa-users"></i> Manage Users</h2>
         <div>
@@ -58,22 +63,24 @@
     </div>
 
     <div class="table-container">
-        <div id="loadingMessage" class="text-center py-4">
+        <!-- Loading Spinner -->
+        <div id="loadingSpinner" class="loading-spinner">
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
             <p class="mt-2">Loading users...</p>
         </div>
         
+        <!-- Users Table -->
         <div id="usersTable" style="display: none;">
             <div class="table-responsive">
-                <table class="table table-hover" id="usersTableBody">
+                <table class="table table-hover">
                     <thead class="table-primary">
                         <tr>
                             <th>ID</th>
                             <th>Username</th>
                             <th>Email</th>
-                            <th>Current Role</th>
+                            <th>Role</th>
                             <th>Change Role</th>
                             <th>Actions</th>
                         </tr>
@@ -85,8 +92,14 @@
             </div>
         </div>
         
+        <!-- Error Message -->
         <div id="errorMessage" class="alert alert-danger mt-3" style="display: none;">
             <i class="fas fa-exclamation-triangle"></i> <span id="errorText"></span>
+        </div>
+        
+        <!-- Empty Message -->
+        <div id="emptyMessage" class="alert alert-info mt-3" style="display: none;">
+            <i class="fas fa-info-circle"></i> No users found.
         </div>
     </div>
 </div>
@@ -98,37 +111,52 @@
 // API CONFIGURATION
 // ============================================
 const API_BASE = 'https://product-polarization-analyzer-production.up.railway.app';
-const currentUser = localStorage.getItem('username') || 'admin';
+const currentUser = localStorage.getItem('username') || '';
 
 // ============================================
 // LOAD USERS
 // ============================================
 async function loadUsers() {
+    console.log("🔄 Loading users...");
+    
+    // Show loading spinner
+    document.getElementById('loadingSpinner').style.display = 'block';
+    document.getElementById('usersTable').style.display = 'none';
+    document.getElementById('errorMessage').style.display = 'none';
+    document.getElementById('emptyMessage').style.display = 'none';
+    
     try {
-        document.getElementById('loadingMessage').style.display = 'block';
-        document.getElementById('usersTable').style.display = 'none';
-        document.getElementById('errorMessage').style.display = 'none';
+        const url = `${API_BASE}/api/manage-users`;
+        console.log("📤 Fetching:", url);
         
-        // ✅ CORRECT URL - FastAPI endpoint
-        const response = await fetch(`${API_BASE}/api/manage-users`);
+        const response = await fetch(url);
+        console.log("📥 Response status:", response.status);
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         
         const data = await response.json();
+        console.log("📦 Response data:", data);
         
         if (data.status === 'success') {
-            displayUsers(data.users);
-            document.getElementById('usersTable').style.display = 'block';
+            const users = data.users || [];
+            console.log("👥 Users count:", users.length);
+            
+            if (users.length === 0) {
+                document.getElementById('emptyMessage').style.display = 'block';
+            } else {
+                displayUsers(users);
+                document.getElementById('usersTable').style.display = 'block';
+            }
         } else {
             showError(data.message || 'Failed to load users');
         }
     } catch (error) {
-        console.error('Error loading users:', error);
+        console.error("❌ Error:", error);
         showError(error.message || 'Network error. Please try again.');
     } finally {
-        document.getElementById('loadingMessage').style.display = 'none';
+        document.getElementById('loadingSpinner').style.display = 'none';
     }
 }
 
@@ -136,30 +164,21 @@ async function loadUsers() {
 // DISPLAY USERS
 // ============================================
 function displayUsers(users) {
+    console.log("🎨 Displaying users:", users);
+    
     const tbody = document.getElementById('usersList');
     tbody.innerHTML = '';
     
-    if (!users || users.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="6" class="text-center text-muted py-4">
-                    <i class="fas fa-users fa-2x d-block mb-2"></i>
-                    No users found
-                </td>
-            </tr>
-        `;
-        return;
-    }
-    
     users.forEach(user => {
-        const tr = document.createElement('tr');
-        
-        // Get role badge class
+        // Role badge class
         let badgeClass = 'role-user';
         if (user.role === 'Admin') badgeClass = 'role-admin';
         else if (user.role === 'Research Analyst') badgeClass = 'role-research';
         else if (user.role === 'Evaluator') badgeClass = 'role-evaluator';
         
+        const isCurrentUser = user.username === currentUser;
+        
+        const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${user.id}</td>
             <td><strong>${user.username}</strong></td>
@@ -168,27 +187,29 @@ function displayUsers(users) {
                 <span class="role-badge ${badgeClass}">${user.role || 'User'}</span>
             </td>
             <td>
-                <select class="form-select form-select-sm role-select" style="width: 150px; display: inline-block;" data-userid="${user.id}">
+                <select class="form-select form-select-sm role-select" style="width:140px;display:inline-block;" data-userid="${user.id}">
                     <option value="User" ${user.role === 'User' ? 'selected' : ''}>User</option>
                     <option value="Research Analyst" ${user.role === 'Research Analyst' ? 'selected' : ''}>Research Analyst</option>
                     <option value="Evaluator" ${user.role === 'Evaluator' ? 'selected' : ''}>Evaluator</option>
                     <option value="Admin" ${user.role === 'Admin' ? 'selected' : ''}>Admin</option>
                 </select>
                 <button class="btn btn-sm btn-primary" onclick="updateRole(${user.id})">
-                    <i class="fas fa-check"></i> Update
+                    <i class="fas fa-check"></i>
                 </button>
             </td>
             <td>
-                ${user.username !== currentUser ? 
+                ${isCurrentUser ? 
+                    `<span class="text-muted"><i class="fas fa-lock"></i> You</span>` : 
                     `<button class="btn btn-sm btn-danger" onclick="deleteUser(${user.id}, '${user.username}')">
-                        <i class="fas fa-trash"></i> Delete
-                    </button>` :
-                    `<span class="text-muted"><i class="fas fa-lock"></i> Current User</span>`
+                        <i class="fas fa-trash"></i>
+                    </button>`
                 }
             </td>
         `;
         tbody.appendChild(tr);
     });
+    
+    console.log(`✅ Displayed ${users.length} users`);
 }
 
 // ============================================
@@ -200,12 +221,11 @@ async function updateRole(userId) {
     
     const newRole = select.value;
     
-    if (!confirm(`Are you sure you want to change this user's role to "${newRole}"?`)) {
+    if (!confirm(`Change this user's role to "${newRole}"?`)) {
         return;
     }
     
     try {
-        // ✅ CORRECT URL
         const response = await fetch(`${API_BASE}/api/manage-users/${userId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -215,14 +235,14 @@ async function updateRole(userId) {
         const data = await response.json();
         
         if (data.status === 'success') {
-            alert('✅ User role updated successfully!');
-            loadUsers(); // Refresh
+            alert('✅ User role updated!');
+            loadUsers();
         } else {
-            alert('❌ Failed to update: ' + data.message);
+            alert('❌ Failed: ' + data.message);
         }
     } catch (error) {
-        console.error('Error updating user:', error);
-        alert('❌ Error updating user. Please try again.');
+        console.error('Error:', error);
+        alert('❌ Error updating user');
     }
 }
 
@@ -230,12 +250,11 @@ async function updateRole(userId) {
 // DELETE USER
 // ============================================
 async function deleteUser(userId, username) {
-    if (!confirm(`⚠️ Are you sure you want to delete user "${username}"? This action cannot be undone!`)) {
+    if (!confirm(`⚠️ Delete "${username}"? This cannot be undone!`)) {
         return;
     }
     
     try {
-        // ✅ CORRECT URL
         const response = await fetch(`${API_BASE}/api/manage-users/${userId}`, {
             method: 'DELETE'
         });
@@ -243,19 +262,19 @@ async function deleteUser(userId, username) {
         const data = await response.json();
         
         if (data.status === 'success') {
-            alert('✅ User deleted successfully!');
-            loadUsers(); // Refresh
+            alert('✅ User deleted!');
+            loadUsers();
         } else {
-            alert('❌ Failed to delete: ' + data.message);
+            alert('❌ Failed: ' + data.message);
         }
     } catch (error) {
-        console.error('Error deleting user:', error);
-        alert('❌ Error deleting user. Please try again.');
+        console.error('Error:', error);
+        alert('❌ Error deleting user');
     }
 }
 
 // ============================================
-// REFRESH USERS
+// REFRESH
 // ============================================
 function refreshUsers() {
     loadUsers();
@@ -273,11 +292,14 @@ function showError(message) {
 // LOAD ON PAGE LOAD
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
-    // Check if user is logged in
+    console.log("📄 Page loaded");
+    
     if (!localStorage.getItem('token')) {
+        console.log("🔒 No token found, redirecting to login");
         window.location.href = '/login.html';
         return;
     }
+    
     loadUsers();
 });
 </script>
