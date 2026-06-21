@@ -62,13 +62,12 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
     };
     
     try {
-        // Uniform routing path direct to backend registration handler
-        const response = await fetch('https://product-polarization-analyzer-production.up.railway.app/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(formData)
-        });
-        
+        // CHANGE YAHAN KAREIN:
+const response = await fetch('https://product-polarization-analyzer-production.up.railway.app/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(formData)
+});
         const data = await response.json();
         
         if (response.ok || data.status === 'success') {
