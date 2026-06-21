@@ -294,10 +294,11 @@ async def analyze_polarization(
         
         # ========== GET CUSTOM PARAMETERS ==========
         # ✅ Priority 1: Request body se parameters lein (frontend se aaye hain)
-        custom_k = request.k_value if hasattr(request, 'k_value') and request.k_value else 3
-        weights = request.weights if hasattr(request, 'weights') and request.weights else {
-            "price": 1.0, "rating": 1.0, "reviews": 1.0, "popularity": 1.0
-        }
+       # ✅ Direct access - Pydantic model handle kar lega
+        custom_k = request.k_value if request.k_value else 3
+        weights = request.weights if request.weights else {
+        "price": 1.0, "rating": 1.0, "reviews": 1.0, "popularity": 1.0
+}
         
         # ✅ Priority 2: Agar request mein nahi hain toh research_analyst_params se lein
         if role == "Research Analyst" and username and username in research_analyst_params:
