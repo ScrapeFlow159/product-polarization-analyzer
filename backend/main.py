@@ -249,6 +249,8 @@ class AnalysisRequest(BaseModel):
     max_products: Optional[int] = 100
     analysis_type: Optional[str] = "current"  # current, weekly, monthly
     save_to_db: Optional[bool] = True
+    k_value: Optional[int] = 3  # ✅ ADD THIS
+    weights: Optional[Dict[str, float]] = None 
 
 class CustomAnalysisRequest(BaseModel):
     platform: str
@@ -289,15 +291,27 @@ async def analyze_polarization(
         print(f"{'='*60}")
         
         # ========== GET CUSTOM PARAMETERS ==========
-        custom_k = 3
-        weights = {"price": 1.0, "rating": 1.0, "reviews": 1.0, "popularity": 1.0}
+        # ✅ Priority 1: Request body se parameters lein (frontend se aaye hain)
+        custom_k = request.k_value if hasattr(request, 'k_value') and request.k_value else 3
+        weights = request.weights if hasattr(request, 'weights') and request.weights else {
+            "price": 1.0, "rating": 1.0, "reviews": 1.0, "popularity": 1.0
+        }
         
+        # ✅ Priority 2: Agar request mein nahi hain toh research_analyst_params se lein
         if role == "Research Analyst" and username and username in research_analyst_params:
-            custom_k = research_analyst_params[username].get("k_value", 3)
-            weights = research_analyst_params[username].get("weights", weights)
-            print(f"📊 USING CUSTOM PARAMETERS: k={custom_k}, weights={weights}")
-        else:
-            print(f"📊 Using DEFAULT parameters")
+            saved_k = research_analyst_params[username].get("k_value")
+            saved_weights = research_analyst_params[username].get("weights")
+            
+            # Sirf tab override karein jab request mein nahi bheja gaya ho
+            if custom_k == 3 and saved_k:
+                custom_k = saved_k
+                print(f"📊 Using saved K from params: {custom_k}")
+            if not weights or weights == {"price": 1.0, "rating": 1.0, "reviews": 1.0, "popularity": 1.0}:
+                if saved_weights:
+                    weights = saved_weights
+                    print(f"📊 Using saved weights from params: {weights}")
+        
+        print(f"📊 FINAL PARAMETERS: k={custom_k}, weights={weights}")
         
         # ========== PLATFORM SELECTION & DATA EXTRACTION ==========
         if request.platform.lower() == "daraz":
