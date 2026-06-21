@@ -395,7 +395,7 @@ async function exportCSV() {
     const category = document.getElementById('exportCategory').value;
     const analysisType = document.getElementById('exportType').value;
     // FIXED: Cleaned root API prefix path mapping
-    const url = `${API_URL}/export-results?platform=daraz&category=${category}&analysis_type=${analysisType}&username=${username}&role=${role}`;
+    const url = `${API_URL}/api/export-results?platform=daraz&category=${category}&analysis_type=${analysisType}&username=${username}&role=${role}`;
     window.open(url, '_blank');
 }
 
