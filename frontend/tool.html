@@ -986,6 +986,19 @@ if (!token || token === "null" || token === "undefined") {
 // 2. FIXED ANALYZE FUNCTION WORKFLOW (CORS & SEQUENCE FIXED)
 // ==========================================
 async function analyzeCurrentPolarization(selectedCategories, platform) {
+
+    let backendPlatform;
+    const p = platform.toLowerCase();
+
+    if (p.includes('daraz')) {
+        backendPlatform = 'Daraz.pk';
+    } else if (p.includes('etsy')) {
+        backendPlatform = 'Etsy.com';
+    } else {
+        backendPlatform = platform; 
+    }
+    
+    console.log("Final Platform sent to backend:", backendPlatform);
     if (!selectedCategories || selectedCategories.length === 0) {
         alert("Please select at least one category.");
         return;
@@ -998,9 +1011,7 @@ async function analyzeCurrentPolarization(selectedCategories, platform) {
     updateStep('current', 1, 'active');
 
     try {
-        // Platform structure automatic formatting for backend
-        const backendPlatform = platform === 'daraz' ? 'Daraz.pk' : (platform === 'etsy' ? 'Etsy.com' : platform);
-
+        
         // API URL equipped with matched sequence credentials
         const url = `${API_BASE_URL}/api/analyze-custom?username=${encodeURIComponent(username)}&role=${encodeURIComponent(role)}`;
         
