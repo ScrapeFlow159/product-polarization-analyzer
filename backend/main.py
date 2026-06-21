@@ -40,19 +40,19 @@ import csv
 from io import StringIO
 from fastapi.responses import StreamingResponse
 
+# main.py mein ye change karein
 origins = [
-    "https://product-polarization-analyzer.vercel.app",
-    "http://localhost:3000",  # Agar local testing karni ho
+    "https://product-polarization-analyzer-135z9naw0.vercel.app", # Naya URL
+    "https://product-polarization-analyzer.vercel.app"          # Purana URL bhi rehne dein (just in case)
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # Ya testing ke liye ["*"] rakh sakte hain
+    allow_origins=origins, # Ab origins list use karein
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-
 # Data models
 class Product(BaseModel):
     name: str

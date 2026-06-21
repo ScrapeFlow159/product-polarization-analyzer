@@ -31,10 +31,9 @@ def create_jwt_token(username, role):
 app = Flask(__name__)
 
 # flask_app.py mein is tarah configure karein
-CORS(app, 
-     origins=["https://product-polarization-analyzer.vercel.app"],
-     methods=["GET", "POST", "OPTIONS"],
-     allow_headers=["Content-Type", "Authorization"])
+# flask_app.py
+# flask_app.py mein ye change karein
+CORS(app, origins=["https://product-polarization-analyzer-135z9naw0.vercel.app", "https://product-polarization-analyzer.vercel.app"])
 SENDER_EMAIL = "arobaarif271@gmail.com"
 
 def ensure_role_column():
