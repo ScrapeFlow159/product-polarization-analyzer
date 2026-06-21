@@ -1024,16 +1024,16 @@ async function analyzeCurrentPolarization(selectedCategories, platform) {
                 'Authorization': `Bearer ${token.trim()}` // ✨ Secure Token Attachment
             },
             // tool.html mein body ko change karke yeh karein:
-body: JSON.stringify({
-    platform: backendPlatform,
-    category: selectedCategories[0] || "default_category", // Sirf pehli value string mein bhejain
-    subcategory: selectedCategories[1] || "all",         // Doosri value subcategory mein
-    unit: 'days',
-    duration: 7,
-    max_products: 50,
-    analysis_type: 'current',
-    save_to_db: true
-})
+        body: JSON.stringify({
+        platform: backendPlatform,
+        category: selectedCategories[0] || "default_category", // Sirf pehli value string mein bhejain
+         subcategory: selectedCategories.length > 1 ? selectedCategories[1] : "all",
+        unit: 'days',
+        duration: 7,
+        max_products: 50,
+        analysis_type: 'current',
+        save_to_db: true
+        })
         });
 
         if (!response.ok) {
