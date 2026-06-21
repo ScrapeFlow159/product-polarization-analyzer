@@ -985,18 +985,10 @@ if (!token || token === "null" || token === "undefined") {
 // ==========================================
 // 2. FIXED ANALYZE FUNCTION WORKFLOW (CORS & SEQUENCE FIXED)
 // ==========================================
+// ==========================================
+// ANALYZE WITH ROLE-BASED PARAMETERS
+// ==========================================
 async function analyzeCurrentPolarization(selectedCategories, platform) {
-
-    // Platform logic ko update karein:
-     let backendPlatform = platform.toUpperCase(); // Force Uppercase!
-
-     // Agar log mein DARAZ.PK hai, to check karein:
-    if (backendPlatform.includes('DARAZ')) {
-        backendPlatform = 'DARAZ.PK';
-    } else if (backendPlatform.includes('ETSY')) {
-        backendPlatform = 'ETSY.COM';
-    }
-    console.log("Final Platform sent to backend:", backendPlatform);
     if (!selectedCategories || selectedCategories.length === 0) {
         alert("Please select at least one category.");
         return;
@@ -1009,29 +1001,62 @@ async function analyzeCurrentPolarization(selectedCategories, platform) {
     updateStep('current', 1, 'active');
 
     try {
+        const username = localStorage.getItem('username') || 'haroon';
+        const role = localStorage.getItem('role') || 'User';
+        const token = localStorage.getItem('token');
         
-        // API URL equipped with matched sequence credentials
-        const url = `${API_BASE_URL}/api/analyze-custom?username=${encodeURIComponent(username)}&role=${encodeURIComponent(role)}`;
+        // ✅ STEP 1: Fetch parameters ONLY if Research Analyst
+        let k_value = 3;
+        let weights = {
+            price: 1.0,
+            rating: 1.0,
+            reviews: 1.0,
+            popularity: 1.0
+        };
         
-        // Step 1: Triggering Backend Secure Pipeline
+        if (role === 'Research Analyst') {
+            const savedParams = await fetchSavedParameters();
+            if (savedParams) {
+                k_value = savedParams.k_value || 3;
+                weights = savedParams.weights || weights;
+                console.log('🔬 Research Analyst - Using custom parameters:', { k_value, weights });
+            } else {
+                console.log('🔬 Research Analyst - Using default parameters (no saved config)');
+            }
+        } else {
+            console.log(`👤 ${role} - Using default parameters`);
+        }
+
+        // Platform mapping
+        let backendPlatform = platform.toUpperCase();
+        if (backendPlatform.includes('DARAZ')) {
+            backendPlatform = 'DARAZ.PK';
+        } else if (backendPlatform.includes('ETSY')) {
+            backendPlatform = 'ETSY.COM';
+        }
+        
+        const url = `${API_BASE_URL}/api/analyze?username=${encodeURIComponent(username)}&role=${encodeURIComponent(role)}`;
+        
+        updateStep('current', 1, 'completed');
+        updateStep('current', 2, 'active');
+
         const response = await fetch(url, {
             method: 'POST',
-            mode: 'cors', // ✨ CORS network handling fix
+            mode: 'cors',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token.trim()}` // ✨ Secure Token Attachment
+                'Authorization': `Bearer ${token}`
             },
-            // tool.html mein body ko change karke yeh karein:
-        body: JSON.stringify({
-        platform: backendPlatform,
-        category: selectedCategories[0] || "default_category", // Sirf pehli value string mein bhejain
-         subcategory: selectedCategories.length > 1 ? selectedCategories[1] : "all",
-        unit: 'days',
-        duration: 7,
-        max_products: 50,
-        analysis_type: 'current',
-        save_to_db: true
-        })
+            body: JSON.stringify({
+                platform: backendPlatform,
+                category: selectedCategories[0] || "default_category",
+                subcategory: selectedCategories.length > 1 ? selectedCategories[1] : "all",
+                max_products: 50,
+                analysis_type: 'current',
+                save_to_db: true,
+                k_value: k_value,
+                weights: weights
+            })
         });
 
         if (!response.ok) {
@@ -1039,30 +1064,36 @@ async function analyzeCurrentPolarization(selectedCategories, platform) {
             throw new Error(errData.detail || `Server responded with status ${response.status}`);
         }
 
-        updateStep('current', 1, 'completed');
-        updateStep('current', 2, 'active');
-        
-        const data = await response.json();
-        
         updateStep('current', 2, 'completed');
+        updateStep('current', 3, 'active');
+
+        const data = await response.json();
+
         updateStep('current', 3, 'completed');
         updateStep('current', 4, 'completed');
 
-        if (typeof renderAnalysisResults === 'function') {
-            renderAnalysisResults(data);
-        } else {
-            console.log("Data successfully received:", data);
-            alert("✅ Polarization analysis loaded successfully!");
+        if (data && data.polarization_score) {
+            const paramsInfo = role === 'Research Analyst' 
+                ? `🔬 Research Analyst: K=${k_value}`
+                : `👤 ${role}: Default parameters (K=3)`;
+            
+            console.log('📊 Analysis Result:', data);
+            console.log('📋 Params Used:', paramsInfo);
+            
+            if (typeof renderAnalysisResults === 'function') {
+                renderAnalysisResults(data);
+            } else {
+                alert(`✅ Analysis complete! Polarization Score: ${data.polarization_score}\n${paramsInfo}`);
+            }
         }
 
     } catch (error) {
         console.error("Fetch Exception caught:", error);
-        alert("❌ Analyze Polarization Failed: " + error.message + "\nCheck browser Console tab (F12) for network context.");
+        alert("❌ Analyze Polarization Failed: " + error.message);
     } finally {
         if (loadingContainer) loadingContainer.style.display = 'none';
     }
 }
-
 // Helper functions matching layout step statuses
 function updateStep(page, stepNum, status) {
     const stepEl = document.getElementById(`${page}Step${stepNum}`);
@@ -1079,17 +1110,24 @@ function resetSteps(page) {
 }
 </script>
         <!-- User Info Bar -->
-<div class="user-info-bar" style="background: white; border-radius: 10px; padding: 10px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+<div class="user-info-bar" style="background: white; border-radius: 10px; padding: 10px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
     <div>
-        <i class="fas fa-user-circle"></i> 
-        Logged in as: <strong id="username">Guest</strong>
-        <span class="badge" id="userRole" style="margin-left: 10px;">Role</span>
+        <i class="fas fa-user-circle" style="color: #667eea;"></i> 
+        Logged in as: <strong id="usernameDisplay">Guest</strong>
+        <span class="badge" id="userRoleDisplay" style="margin-left: 10px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 4px 12px; border-radius: 20px;">Role</span>
+        <span id="paramStatus" style="margin-left: 10px; font-size: 0.8rem; color: #10b981; display: none;">
+            <i class="fas fa-cog"></i> Custom: K=?
+        </span>
     </div>
-    <a href="/auth/logout" class="btn btn-sm btn-danger">
-        <i class="fas fa-sign-out-alt"></i> Logout
-    </a>
+    <div style="display: flex; gap: 10px;">
+        <a href="/dashboard.html" class="btn btn-sm btn-primary" style="background: #667eea; border: none; color: white; padding: 6px 15px; border-radius: 8px; text-decoration: none;">
+            <i class="fas fa-tachometer-alt"></i> Dashboard
+        </a>
+        <button onclick="logoutUser()" class="btn btn-sm btn-danger" style="background: #dc3545; border: none; color: white; padding: 6px 15px; border-radius: 8px; cursor: pointer;">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+    </div>
 </div>
-
 
 <script>
 // ========== DAILY PRODUCTS MODAL FUNCTIONS ==========
@@ -2722,6 +2760,106 @@ if (page === 'current') {
             const targetContent = document.getElementById(`${page}Tab_${category}`);
             if (targetContent) targetContent.classList.add('active');
         };
+
+    // ==========================================
+// FETCH SAVED PARAMETERS - ONLY FOR RESEARCH ANALYST
+// ==========================================
+async function fetchSavedParameters() {
+    try {
+        const username = localStorage.getItem('username') || 'haroon';
+        const role = localStorage.getItem('role') || 'User';
+        const token = localStorage.getItem('token');
+        
+        // ✅ ONLY Research Analyst can use saved parameters
+        if (role !== 'Research Analyst') {
+            console.log('👤 User role:', role, '- Using default parameters');
+            return null;
+        }
+        
+        console.log('🔬 Research Analyst - Fetching saved parameters...');
+        
+        const url = `${API_BASE_URL}/api/get-params?username=${username}&role=${role}`;
+        
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (response.ok) {
+            const params = await response.json();
+            console.log('📦 Saved Research Analyst Parameters:', params);
+            return params;
+        } else {
+            console.warn('⚠️ Failed to fetch params, using defaults');
+            return null;
+        }
+    } catch (error) {
+        console.error('❌ Error fetching params:', error);
+        return null;
+    }
+}
+
+// ==========================================
+// DISPLAY USER INFO WITH PARAM STATUS
+// ==========================================
+document.addEventListener('DOMContentLoaded', function() {
+    const username = localStorage.getItem('username') || 'Guest';
+    const role = localStorage.getItem('role') || 'User';
+    
+    const nameDisplay = document.getElementById('usernameDisplay');
+    const roleDisplay = document.getElementById('userRoleDisplay');
+    
+    if (nameDisplay) nameDisplay.textContent = username;
+    if (roleDisplay) roleDisplay.textContent = role;
+    
+    // ✅ Show param status for Research Analyst
+    const paramStatus = document.getElementById('paramStatus');
+    if (role === 'Research Analyst' && paramStatus) {
+        paramStatus.style.display = 'inline';
+        checkSavedParams();
+    }
+});
+
+// ==========================================
+// CHECK IF PARAMS ARE SAVED
+// ==========================================
+async function checkSavedParams() {
+    try {
+        const username = localStorage.getItem('username');
+        const role = localStorage.getItem('role');
+        const token = localStorage.getItem('token');
+        
+        const response = await fetch(`${API_BASE_URL}/api/get-params?username=${username}&role=${role}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            const params = await response.json();
+            const paramStatus = document.getElementById('paramStatus');
+            if (paramStatus && params.k_value && params.k_value !== 3) {
+                paramStatus.innerHTML = `<i class="fas fa-cog"></i> Custom: K=${params.k_value}`;
+                paramStatus.style.display = 'inline';
+                paramStatus.style.color = '#10b981';
+            }
+        }
+    } catch (e) {
+        console.warn('Could not check params status');
+    }
+}
+
+// ==========================================
+// LOGOUT FUNCTION
+// ==========================================
+function logoutUser() {
+    if (confirm('Are you sure you want to logout?')) {
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.href = '/login.html';
+    }
+}
     </script>
 </body>
 </html>
