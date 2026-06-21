@@ -2004,8 +2004,7 @@ async function runAnalysis(page) {
         if (page === 'weekly') analysisType = 'weekly';
         if (page === 'monthly') analysisType = 'monthly';
         
-        // ✨ FIXED: Platform string matching according to backend requirements
-        const backendPlatform = state.platform === 'daraz' ? 'Daraz.pk' : 'Etsy.com';
+        const backendPlatform = state.platform;
         
         // ✨ URL MISMATCH FIXED: Grabbing fresh forced lowercase values from localStorage
         const activeUsername = (localStorage.getItem('username') || 'haroon').trim().toLowerCase();
