@@ -55,7 +55,7 @@ document.getElementById('otpForm').addEventListener('submit', async (e) => {
     
     try {
         // Aapka direct Railway live server link
-        const response = await fetch('https://product-polarization-analyzer-production.up.railway.app/verify_otp', {
+        const response = await fetch('https://product-polarization-analyzer-production.up.railway.app/auth/verify_otp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
