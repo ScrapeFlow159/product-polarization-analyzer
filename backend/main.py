@@ -55,19 +55,22 @@ app.add_middleware(
 )
 
 print("Flask app mounted successfully on /auth")
+# main.py - ADMIN ENDPOINTS (Corrected)
+# ============================================
 
-# ============================================
-# ADMIN ENDPOINTS - ADD YE CODE main.py MEIN
-# ============================================
+import os
+import sqlite3
+from fastapi import Request
+
+# ✅ USERS_DB_PATH define karein
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+USERS_DB_PATH = os.path.join(BASE_DIR, "users.db")
 
 @app.get("/api/manage-users")
 async def get_users():
     """Get all users for admin panel"""
     try:
-        import sqlite3
-        from database import DB_PATH
-        
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(USERS_DB_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT id, username, email, role FROM users")
         users = cursor.fetchall()
@@ -96,10 +99,7 @@ async def update_user(user_id: int, request: Request):
         if not new_role:
             return {"status": "error", "message": "Role required"}, 400
         
-        import sqlite3
-        from database import DB_PATH
-        
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(USERS_DB_PATH)
         cursor = conn.cursor()
         cursor.execute(
             "UPDATE users SET role = ? WHERE id = ?",
@@ -120,10 +120,7 @@ async def update_user(user_id: int, request: Request):
 async def delete_user(user_id: int):
     """Delete user"""
     try:
-        import sqlite3
-        from database import DB_PATH
-        
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(USERS_DB_PATH)
         cursor = conn.cursor()
         cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
         conn.commit()
@@ -174,33 +171,17 @@ async def view_logs():
     """View system logs"""
     try:
         logs = []
-        
-        # Try multiple log file locations
         log_files = ["app.log", "logs/app.log", "log.txt", "server.log"]
         
         for log_file in log_files:
             if os.path.exists(log_file):
                 with open(log_file, 'r') as f:
                     lines = f.readlines()
-                    logs = lines[-100:]  # Last 100 lines
-                    break
+                    logs = lines[-100:]
+                break
         
         if not logs:
-            # Try to get from railway
-            try:
-                import subprocess
-                result = subprocess.run(
-                    ["tail", "-50", "/proc/1/fd/1"], 
-                    capture_output=True, 
-                    text=True,
-                    timeout=5
-                )
-                if result.stdout:
-                    logs = result.stdout.split('\n')
-                else:
-                    logs = ["No logs found. System is running."]
-            except:
-                logs = ["No logs found. Check Railway console for logs."]
+            logs = ["No logs found. System is running smoothly!"]
         
         return {
             "status": "success",
@@ -214,10 +195,7 @@ async def view_logs():
 async def health_check():
     """Health check endpoint"""
     try:
-        import sqlite3
-        from database import DB_PATH
-        
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(USERS_DB_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM users")
         user_count = cursor.fetchone()[0]
