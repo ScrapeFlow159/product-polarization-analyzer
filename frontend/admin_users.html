@@ -1,307 +1,97 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Manage Users - Admin Panel</title>
+    <title>Manage Users</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
-    <style>
-        body {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .btn-gradient {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            border: none;
-            padding: 8px 20px;
-            border-radius: 8px;
-            font-weight: 600;
-            transition: all 0.3s;
-            text-decoration: none;
-        }
-        .btn-gradient:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-            color: white;
-        }
-        .table-container {
-            background: white;
-            border-radius: 15px;
-            padding: 20px;
-            margin-top: 20px;
-        }
-        .role-badge {
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 12px;
-        }
-        .role-admin { background: #dc3545; color: white; }
-        .role-research { background: #ffc107; color: black; }
-        .role-evaluator { background: #17a2b8; color: white; }
-        .role-user { background: #6c757d; color: white; }
-        .loading-spinner {
-            text-align: center;
-            padding: 40px;
-        }
-    </style>
 </head>
 <body>
-
-<div class="container">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="text-white"><i class="fas fa-users"></i> Manage Users</h2>
-        <div>
-            <button class="btn-gradient me-2" onclick="refreshUsers()">
-                <i class="fas fa-sync"></i> Refresh
-            </button>
-            <a href="/dashboard.html" class="btn-gradient">
-                <i class="fas fa-arrow-left"></i> Back to Dashboard
-            </a>
+    <div class="container mt-4">
+        <h2 class="text-white">Manage Users</h2>
+        <div class="bg-white p-4 rounded mt-3">
+            <div id="loading">Loading...</div>
+            <div id="usersContainer" style="display:none;"></div>
+            <div id="error" style="display:none;color:red;"></div>
         </div>
     </div>
 
-    <div class="table-container">
-        <!-- Loading Spinner -->
-        <div id="loadingSpinner" class="loading-spinner">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <p class="mt-2">Loading users...</p>
-        </div>
-        
-        <!-- Users Table -->
-        <div id="usersTable" style="display: none;">
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead class="table-primary">
-                        <tr>
-                            <th>ID</th>
-                            <th>Username</th>
-                            <th>Email</th>
-                            <th>Role</th>
-                            <th>Change Role</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="usersList">
-                        <!-- Users will be loaded here -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        
-        <!-- Error Message -->
-        <div id="errorMessage" class="alert alert-danger mt-3" style="display: none;">
-            <i class="fas fa-exclamation-triangle"></i> <span id="errorText"></span>
-        </div>
-        
-        <!-- Empty Message -->
-        <div id="emptyMessage" class="alert alert-info mt-3" style="display: none;">
-            <i class="fas fa-info-circle"></i> No users found.
-        </div>
-    </div>
-</div>
+    <script>
+    // ✅ DIRECT API CALL - NO TOKEN CHECK
+    const API_BASE = 'https://product-polarization-analyzer-production.up.railway.app';
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
-<script>
-// ============================================
-// API CONFIGURATION
-// ============================================
-const API_BASE = 'https://product-polarization-analyzer-production.up.railway.app';
-const currentUser = localStorage.getItem('username') || '';
-
-// ============================================
-// LOAD USERS
-// ============================================
-async function loadUsers() {
-    console.log("🔄 Loading users...");
-    
-    // Show loading spinner
-    document.getElementById('loadingSpinner').style.display = 'block';
-    document.getElementById('usersTable').style.display = 'none';
-    document.getElementById('errorMessage').style.display = 'none';
-    document.getElementById('emptyMessage').style.display = 'none';
-    
-    try {
-        const url = `${API_BASE}/api/manage-users`;
-        console.log("📤 Fetching:", url);
+    async function loadUsers() {
+        const loading = document.getElementById('loading');
+        const container = document.getElementById('usersContainer');
+        const errorDiv = document.getElementById('error');
         
-        const response = await fetch(url);
-        console.log("📥 Response status:", response.status);
+        loading.style.display = 'block';
+        container.style.display = 'none';
+        errorDiv.style.display = 'none';
         
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log("📦 Response data:", data);
-        
-        if (data.status === 'success') {
-            const users = data.users || [];
-            console.log("👥 Users count:", users.length);
+        try {
+            const response = await fetch(`${API_BASE}/api/manage-users`);
+            const data = await response.json();
             
-            if (users.length === 0) {
-                document.getElementById('emptyMessage').style.display = 'block';
+            console.log('✅ API Response:', data);
+            
+            if (data.status === 'success' && data.users) {
+                let html = `
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                data.users.forEach(user => {
+                    // Role badge color
+                    let badgeClass = 'bg-secondary';
+                    if (user.role === 'Admin') badgeClass = 'bg-danger';
+                    else if (user.role === 'Research Analyst') badgeClass = 'bg-warning text-dark';
+                    
+                    html += `
+                        <tr>
+                            <td>${user.id}</td>
+                            <td><strong>${user.username}</strong></td>
+                            <td>${user.email || 'N/A'}</td>
+                            <td><span class="badge ${badgeClass}">${user.role}</span></td>
+                        </tr>
+                    `;
+                });
+                
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-muted">Total: ${data.users.length} users</p>
+                `;
+                
+                container.innerHTML = html;
+                container.style.display = 'block';
             } else {
-                displayUsers(users);
-                document.getElementById('usersTable').style.display = 'block';
+                errorDiv.textContent = 'Failed to load users: ' + (data.message || 'Unknown error');
+                errorDiv.style.display = 'block';
             }
-        } else {
-            showError(data.message || 'Failed to load users');
+        } catch (error) {
+            console.error('❌ Error:', error);
+            errorDiv.textContent = 'Network error: ' + error.message;
+            errorDiv.style.display = 'block';
+        } finally {
+            loading.style.display = 'none';
         }
-    } catch (error) {
-        console.error("❌ Error:", error);
-        showError(error.message || 'Network error. Please try again.');
-    } finally {
-        document.getElementById('loadingSpinner').style.display = 'none';
     }
-}
 
-// ============================================
-// DISPLAY USERS
-// ============================================
-function displayUsers(users) {
-    console.log("🎨 Displaying users:", users);
-    
-    const tbody = document.getElementById('usersList');
-    tbody.innerHTML = '';
-    
-    users.forEach(user => {
-        // Role badge class
-        let badgeClass = 'role-user';
-        if (user.role === 'Admin') badgeClass = 'role-admin';
-        else if (user.role === 'Research Analyst') badgeClass = 'role-research';
-        else if (user.role === 'Evaluator') badgeClass = 'role-evaluator';
-        
-        const isCurrentUser = user.username === currentUser;
-        
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${user.id}</td>
-            <td><strong>${user.username}</strong></td>
-            <td>${user.email || 'N/A'}</td>
-            <td>
-                <span class="role-badge ${badgeClass}">${user.role || 'User'}</span>
-            </td>
-            <td>
-                <select class="form-select form-select-sm role-select" style="width:140px;display:inline-block;" data-userid="${user.id}">
-                    <option value="User" ${user.role === 'User' ? 'selected' : ''}>User</option>
-                    <option value="Research Analyst" ${user.role === 'Research Analyst' ? 'selected' : ''}>Research Analyst</option>
-                    <option value="Evaluator" ${user.role === 'Evaluator' ? 'selected' : ''}>Evaluator</option>
-                    <option value="Admin" ${user.role === 'Admin' ? 'selected' : ''}>Admin</option>
-                </select>
-                <button class="btn btn-sm btn-primary" onclick="updateRole(${user.id})">
-                    <i class="fas fa-check"></i>
-                </button>
-            </td>
-            <td>
-                ${isCurrentUser ? 
-                    `<span class="text-muted"><i class="fas fa-lock"></i> You</span>` : 
-                    `<button class="btn btn-sm btn-danger" onclick="deleteUser(${user.id}, '${user.username}')">
-                        <i class="fas fa-trash"></i>
-                    </button>`
-                }
-            </td>
-        `;
-        tbody.appendChild(tr);
+    // ✅ Load directly on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('📄 Page loaded');
+        loadUsers();
     });
-    
-    console.log(`✅ Displayed ${users.length} users`);
-}
-
-// ============================================
-// UPDATE USER ROLE
-// ============================================
-async function updateRole(userId) {
-    const select = document.querySelector(`.role-select[data-userid="${userId}"]`);
-    if (!select) return;
-    
-    const newRole = select.value;
-    
-    if (!confirm(`Change this user's role to "${newRole}"?`)) {
-        return;
-    }
-    
-    try {
-        const response = await fetch(`${API_BASE}/api/manage-users/${userId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ role: newRole })
-        });
-        
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-            alert('✅ User role updated!');
-            loadUsers();
-        } else {
-            alert('❌ Failed: ' + data.message);
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('❌ Error updating user');
-    }
-}
-
-// ============================================
-// DELETE USER
-// ============================================
-async function deleteUser(userId, username) {
-    if (!confirm(`⚠️ Delete "${username}"? This cannot be undone!`)) {
-        return;
-    }
-    
-    try {
-        const response = await fetch(`${API_BASE}/api/manage-users/${userId}`, {
-            method: 'DELETE'
-        });
-        
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-            alert('✅ User deleted!');
-            loadUsers();
-        } else {
-            alert('❌ Failed: ' + data.message);
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('❌ Error deleting user');
-    }
-}
-
-// ============================================
-// REFRESH
-// ============================================
-function refreshUsers() {
-    loadUsers();
-}
-
-// ============================================
-// SHOW ERROR
-// ============================================
-function showError(message) {
-    document.getElementById('errorText').textContent = message;
-    document.getElementById('errorMessage').style.display = 'block';
-}
-
-// ============================================
-// LOAD ON PAGE LOAD
-// ============================================
-document.addEventListener('DOMContentLoaded', function() {
-    console.log("📄 Page loaded");
-    
-    if (!localStorage.getItem('token')) {
-        console.log("🔒 No token found, redirecting to login");
-        window.location.href = '/login.html';
-        return;
-    }
-    
-    loadUsers();
-});
-</script>
+    </script>
 </body>
 </html>
