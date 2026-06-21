@@ -1126,8 +1126,7 @@ function resetSteps(page) {
         <button onclick="logoutUser()" class="btn btn-sm btn-danger" style="background: #dc3545; border: none; color: white; padding: 6px 15px; border-radius: 8px; cursor: pointer;">
             <i class="fas fa-sign-out-alt"></i> Logout
         </button>
-    </div>
-</div>
+
 
 <script>
 // ========== DAILY PRODUCTS MODAL FUNCTIONS ==========
@@ -2029,7 +2028,7 @@ async function runAnalysis(page) {
     
     // ✅ Disable button to prevent multiple clicks
     const analyzeBtn = document.getElementById(`${page}AnalyzeBtn`);
-    if (analyzeBtn && analyzeBtn.disabled) return; // Already running
+    if (analyzeBtn && analyzeBtn.disabled) return;
     if (analyzeBtn) analyzeBtn.disabled = true;
     
     try {
@@ -2044,22 +2043,42 @@ async function runAnalysis(page) {
         
         const backendPlatform = state.platform;
         
-        // ✨ URL MISMATCH FIXED: Grabbing fresh forced lowercase values from localStorage
         const activeUsername = (localStorage.getItem('username') || 'haroon').trim().toLowerCase();
         const activeRole = (localStorage.getItem('role') || 'User').trim();
         const activeToken = localStorage.getItem('token') || token;
 
-        // Fetch analysis for each category
+        // ✅ STEP 1: Fetch parameters ONLY if Research Analyst
+        let k_value = 3;
+        let weights = {
+            price: 1.0,
+            rating: 1.0,
+            reviews: 1.0,
+            popularity: 1.0
+        };
+        
+        if (activeRole === 'Research Analyst') {
+            const savedParams = await fetchSavedParameters();
+            if (savedParams) {
+                k_value = savedParams.k_value || 3;
+                weights = savedParams.weights || weights;
+                console.log('🔬 Research Analyst - Using custom parameters:', { k_value, weights });
+            } else {
+                console.log('🔬 Research Analyst - Using default parameters (no saved config)');
+            }
+        } else {
+            console.log(`👤 ${activeRole} - Using default parameters`);
+        }
+
+        // ✅ STEP 2: Send request with parameters
         for (let i = 0; i < state.selected.length; i++) {
             const category = state.selected[i];
-            console.log(`📡 Shipping Network Pipeline for: ${backendPlatform} -> ${category}`);
+            console.log(`📡 Analyzing: ${backendPlatform} -> ${category} with K=${k_value}`);
             
-            // ✅ URL query string matches backend token data structure perfectly now
             const url = `${API_BASE_URL}/api/analyze?username=${encodeURIComponent(activeUsername)}&role=${encodeURIComponent(activeRole)}`;
 
             const response = await fetch(url, {
                 method: 'POST',
-                mode: 'cors', // ✨ FIXED: CORS header bypass control injected
+                mode: 'cors',
                 headers: { 
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${activeToken.trim()}`
@@ -2070,29 +2089,31 @@ async function runAnalysis(page) {
                     subcategory: category,
                     max_products: 50,
                     analysis_type: analysisType,
-                    save_to_db: true
+                    save_to_db: true,
+                    // ✅ FIXED: Send K-value and weights
+                    k_value: k_value,
+                    weights: weights
                 })
             });
             
             if (response.ok) {
                 const data = await response.json();
                 state.results[category] = data;
+                console.log(`✅ ${category} analysis complete with K=${k_value}`);
             } else {
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(errorData.detail || `Server Validation Error: ${response.status}`);
             }
         }
         
-        // Fetch comparison data for difference display
+        // Fetch comparison data
         for (let i = 0; i < state.selected.length; i++) {
             const category = state.selected[i];
             try {
                 const targetPlatform = state.platform === 'daraz' ? 'Daraz.pk' : 'Etsy.com';
-                const activeToken = localStorage.getItem('token') || token;
-
                 const compResponse = await fetch(`${API_BASE_URL}/api/comparison/${targetPlatform}/${category}`, {
                     method: 'GET',
-                    mode: 'cors', // ✨ FIXED: CORS handling added to comparison engine too
+                    mode: 'cors',
                     headers: {
                         'Authorization': `Bearer ${activeToken.trim()}`,
                         'Content-Type': 'application/json'
@@ -2105,19 +2126,27 @@ async function runAnalysis(page) {
                     else monthlyComparisonData[category] = compData;
                 }
             } catch(e) { 
-                console.error("Bypassed comparison data sync framework:", e); 
+                console.error("Comparison data error:", e); 
             }
         }
         
         setState(page, state);
         displayResults(page);
         
+        // ✅ Show params used in results
+        if (state.selected.length > 0) {
+            const firstCategory = state.selected[0];
+            const data = state.results[firstCategory];
+            if (data) {
+                console.log(`📊 Analysis complete! K=${k_value}, Score: ${data.polarization_score}`);
+            }
+        }
+        
     } catch (error) {
         console.error('❌ Network Pipeline Crash:', error);
         alert(`❌ Error: ${error.message}`);
     } finally {
         setLoading(page, false);
-        // ✅ Re-enable button after completion safely
         if (analyzeBtn) analyzeBtn.disabled = false;
     }
 }
