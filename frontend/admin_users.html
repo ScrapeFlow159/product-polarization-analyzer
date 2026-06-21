@@ -30,6 +30,16 @@
             padding: 20px;
             margin-top: 20px;
         }
+        .role-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        .role-admin { background: #dc3545; color: white; }
+        .role-research { background: #ffc107; color: black; }
+        .role-evaluator { background: #17a2b8; color: white; }
+        .role-user { background: #6c757d; color: white; }
     </style>
 </head>
 <body>
@@ -37,69 +47,239 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="text-white"><i class="fas fa-users"></i> Manage Users</h2>
-        <a href="{{ url_for('dashboard') }}" class="btn-gradient">
-            <i class="fas fa-arrow-left"></i> Back to Dashboard
-        </a>
+        <div>
+            <button class="btn-gradient me-2" onclick="refreshUsers()">
+                <i class="fas fa-sync"></i> Refresh
+            </button>
+            <a href="/dashboard.html" class="btn-gradient">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
     </div>
 
     <div class="table-container">
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead class="table-primary">
-                    <tr>
-                        <th>ID</th>
-                        <th>Username</th>
-                        <th>Email</th>
-                        <th>Current Role</th>
-                        <th>Change Role</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for user in users %}
-                    <tr>
-                        <td>{{ user[0] }}</td>
-                        <td><strong>{{ user[1] }}</strong></td>
-                        <td>{{ user[2] }}</td>
-                        <td>
-                            <span class="badge 
-                                {% if user[3] == 'Admin' %}bg-danger
-                                {% elif user[3] == 'Research Analyst' %}bg-warning
-                                {% elif user[3] == 'Evaluator' %}bg-info
-                                {% else %}bg-secondary{% endif %}">
-                                {{ user[3] }}
-                            </span>
-                        </td>
-                        <td>
-                            <form method="POST" action="{{ url_for('admin_change_role', user_id=user[0]) }}" style="display: inline;">
-                                <select name="role" class="form-select form-select-sm" style="width: 150px; display: inline-block;">
-                                    <option value="User" {% if user[3] == 'User' %}selected{% endif %}>User</option>
-                                    <option value="Research Analyst" {% if user[3] == 'Research Analyst' %}selected{% endif %}>Research Analyst</option>
-                                    <option value="Evaluator" {% if user[3] == 'Evaluator' %}selected{% endif %}>Evaluator</option>
-                                    <option value="Admin" {% if user[3] == 'Admin' %}selected{% endif %}>Admin</option>
-                                </select>
-                                <button type="submit" class="btn btn-sm btn-primary">Update</button>
-                            </form>
-                        </td>
-                        <td>
-                            {% if user[1] != username %}
-                            <a href="{{ url_for('admin_delete_user', user_id=user[0]) }}" 
-                               class="btn btn-sm btn-danger"
-                               onclick="return confirm('Are you sure you want to delete this user?')">
-                                <i class="fas fa-trash"></i> Delete
-                            </a>
-                            {% else %}
-                            <span class="text-muted"><i class="fas fa-lock"></i> Current User</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div id="loadingMessage" class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading users...</p>
+        </div>
+        
+        <div id="usersTable" style="display: none;">
+            <div class="table-responsive">
+                <table class="table table-hover" id="usersTableBody">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>ID</th>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Current Role</th>
+                            <th>Change Role</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersList">
+                        <!-- Users will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div id="errorMessage" class="alert alert-danger mt-3" style="display: none;">
+            <i class="fas fa-exclamation-triangle"></i> <span id="errorText"></span>
         </div>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+// ============================================
+// API CONFIGURATION
+// ============================================
+const API_BASE = 'https://product-polarization-analyzer-production.up.railway.app';
+const currentUser = localStorage.getItem('username') || 'admin';
+
+// ============================================
+// LOAD USERS
+// ============================================
+async function loadUsers() {
+    try {
+        document.getElementById('loadingMessage').style.display = 'block';
+        document.getElementById('usersTable').style.display = 'none';
+        document.getElementById('errorMessage').style.display = 'none';
+        
+        // ✅ CORRECT URL - FastAPI endpoint
+        const response = await fetch(`${API_BASE}/api/manage-users`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            displayUsers(data.users);
+            document.getElementById('usersTable').style.display = 'block';
+        } else {
+            showError(data.message || 'Failed to load users');
+        }
+    } catch (error) {
+        console.error('Error loading users:', error);
+        showError(error.message || 'Network error. Please try again.');
+    } finally {
+        document.getElementById('loadingMessage').style.display = 'none';
+    }
+}
+
+// ============================================
+// DISPLAY USERS
+// ============================================
+function displayUsers(users) {
+    const tbody = document.getElementById('usersList');
+    tbody.innerHTML = '';
+    
+    if (!users || users.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center text-muted py-4">
+                    <i class="fas fa-users fa-2x d-block mb-2"></i>
+                    No users found
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    users.forEach(user => {
+        const tr = document.createElement('tr');
+        
+        // Get role badge class
+        let badgeClass = 'role-user';
+        if (user.role === 'Admin') badgeClass = 'role-admin';
+        else if (user.role === 'Research Analyst') badgeClass = 'role-research';
+        else if (user.role === 'Evaluator') badgeClass = 'role-evaluator';
+        
+        tr.innerHTML = `
+            <td>${user.id}</td>
+            <td><strong>${user.username}</strong></td>
+            <td>${user.email || 'N/A'}</td>
+            <td>
+                <span class="role-badge ${badgeClass}">${user.role || 'User'}</span>
+            </td>
+            <td>
+                <select class="form-select form-select-sm role-select" style="width: 150px; display: inline-block;" data-userid="${user.id}">
+                    <option value="User" ${user.role === 'User' ? 'selected' : ''}>User</option>
+                    <option value="Research Analyst" ${user.role === 'Research Analyst' ? 'selected' : ''}>Research Analyst</option>
+                    <option value="Evaluator" ${user.role === 'Evaluator' ? 'selected' : ''}>Evaluator</option>
+                    <option value="Admin" ${user.role === 'Admin' ? 'selected' : ''}>Admin</option>
+                </select>
+                <button class="btn btn-sm btn-primary" onclick="updateRole(${user.id})">
+                    <i class="fas fa-check"></i> Update
+                </button>
+            </td>
+            <td>
+                ${user.username !== currentUser ? 
+                    `<button class="btn btn-sm btn-danger" onclick="deleteUser(${user.id}, '${user.username}')">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>` :
+                    `<span class="text-muted"><i class="fas fa-lock"></i> Current User</span>`
+                }
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// ============================================
+// UPDATE USER ROLE
+// ============================================
+async function updateRole(userId) {
+    const select = document.querySelector(`.role-select[data-userid="${userId}"]`);
+    if (!select) return;
+    
+    const newRole = select.value;
+    
+    if (!confirm(`Are you sure you want to change this user's role to "${newRole}"?`)) {
+        return;
+    }
+    
+    try {
+        // ✅ CORRECT URL
+        const response = await fetch(`${API_BASE}/api/manage-users/${userId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role: newRole })
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            alert('✅ User role updated successfully!');
+            loadUsers(); // Refresh
+        } else {
+            alert('❌ Failed to update: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Error updating user:', error);
+        alert('❌ Error updating user. Please try again.');
+    }
+}
+
+// ============================================
+// DELETE USER
+// ============================================
+async function deleteUser(userId, username) {
+    if (!confirm(`⚠️ Are you sure you want to delete user "${username}"? This action cannot be undone!`)) {
+        return;
+    }
+    
+    try {
+        // ✅ CORRECT URL
+        const response = await fetch(`${API_BASE}/api/manage-users/${userId}`, {
+            method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            alert('✅ User deleted successfully!');
+            loadUsers(); // Refresh
+        } else {
+            alert('❌ Failed to delete: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        alert('❌ Error deleting user. Please try again.');
+    }
+}
+
+// ============================================
+// REFRESH USERS
+// ============================================
+function refreshUsers() {
+    loadUsers();
+}
+
+// ============================================
+// SHOW ERROR
+// ============================================
+function showError(message) {
+    document.getElementById('errorText').textContent = message;
+    document.getElementById('errorMessage').style.display = 'block';
+}
+
+// ============================================
+// LOAD ON PAGE LOAD
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if user is logged in
+    if (!localStorage.getItem('token')) {
+        window.location.href = '/login.html';
+        return;
+    }
+    loadUsers();
+});
+</script>
 </body>
 </html>
