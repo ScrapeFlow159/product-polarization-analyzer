@@ -1,97 +1,483 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Manage Users</title>
+    <title>Manage Users - Admin Panel</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <style>
+        /* ===== ORIGINAL DESIGN ===== */
+        body {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .header h2 {
+            color: white;
+        }
+        .header h2 i {
+            margin-right: 10px;
+        }
+        
+        /* Buttons */
+        .btn-gradient {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white !important;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-gradient:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            color: white !important;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            border: none;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        .btn-primary {
+            background: #007bff;
+            border: none;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .btn-primary:hover {
+            background: #0069d9;
+        }
+        
+        /* Table Container */
+        .table-container {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .table-container h5 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        /* Role Badges */
+        .role-badge {
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 12px;
+            display: inline-block;
+        }
+        .role-admin {
+            background: #dc3545;
+            color: white;
+        }
+        .role-research {
+            background: #ffc107;
+            color: black;
+        }
+        .role-evaluator {
+            background: #17a2b8;
+            color: white;
+        }
+        .role-user {
+            background: #6c757d;
+            color: white;
+        }
+        
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table th {
+            background: #e9ecef;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        table td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            vertical-align: middle;
+        }
+        table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        /* Loading Spinner */
+        .loading-spinner {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        .loading-spinner .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+        .loading-spinner p {
+            color: #6c757d;
+            margin-top: 15px;
+        }
+        
+        /* Select Dropdown */
+        .role-select {
+            padding: 5px 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            font-size: 13px;
+            width: 150px;
+        }
+        
+        /* Alerts */
+        .alert {
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .text-muted {
+            color: #6c757d;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .mt-3 {
+            margin-top: 15px;
+        }
+        .mb-4 {
+            margin-bottom: 20px;
+        }
+        .me-2 {
+            margin-right: 10px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            table {
+                font-size: 12px;
+            }
+            table th,
+            table td {
+                padding: 8px;
+            }
+            .role-select {
+                width: 100px;
+                font-size: 11px;
+            }
+            .btn-gradient,
+            .btn-danger,
+            .btn-primary {
+                font-size: 11px;
+                padding: 4px 10px;
+            }
+        }
+    </style>
 </head>
 <body>
-    <div class="container mt-4">
-        <h2 class="text-white">Manage Users</h2>
-        <div class="bg-white p-4 rounded mt-3">
-            <div id="loading">Loading...</div>
-            <div id="usersContainer" style="display:none;"></div>
-            <div id="error" style="display:none;color:red;"></div>
+
+<div class="container">
+    <!-- ===== HEADER WITH BACK BUTTON ===== -->
+    <div class="header">
+        <h2><i class="fas fa-users"></i> Manage Users</h2>
+        <div>
+            <button class="btn-gradient me-2" onclick="refreshUsers()">
+                <i class="fas fa-sync"></i> Refresh
+            </button>
+            <a href="/dashboard.html" class="btn-gradient">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
         </div>
     </div>
 
-    <script>
-    // ✅ DIRECT API CALL - NO TOKEN CHECK
-    const API_BASE = 'https://product-polarization-analyzer-production.up.railway.app';
+    <!-- ===== TABLE CONTAINER ===== -->
+    <div class="table-container">
+        <h5><i class="fas fa-list"></i> All Users</h5>
 
-    async function loadUsers() {
-        const loading = document.getElementById('loading');
-        const container = document.getElementById('usersContainer');
-        const errorDiv = document.getElementById('error');
-        
-        loading.style.display = 'block';
-        container.style.display = 'none';
-        errorDiv.style.display = 'none';
-        
-        try {
-            const response = await fetch(`${API_BASE}/api/manage-users`);
-            const data = await response.json();
-            
-            console.log('✅ API Response:', data);
-            
-            if (data.status === 'success' && data.users) {
-                let html = `
-                    <div class="table-responsive">
-                        <table class="table table-bordered table-hover">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Username</th>
-                                    <th>Email</th>
-                                    <th>Role</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                `;
-                
-                data.users.forEach(user => {
-                    // Role badge color
-                    let badgeClass = 'bg-secondary';
-                    if (user.role === 'Admin') badgeClass = 'bg-danger';
-                    else if (user.role === 'Research Analyst') badgeClass = 'bg-warning text-dark';
-                    
-                    html += `
+        <!-- Loading Spinner -->
+        <div id="loadingSpinner" class="loading-spinner">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p>Loading users...</p>
+        </div>
+
+        <!-- Users Table -->
+        <div id="usersTable" style="display: none;">
+            <div class="table-responsive">
+                <table>
+                    <thead>
                         <tr>
-                            <td>${user.id}</td>
-                            <td><strong>${user.username}</strong></td>
-                            <td>${user.email || 'N/A'}</td>
-                            <td><span class="badge ${badgeClass}">${user.role}</span></td>
+                            <th>ID</th>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Change Role</th>
+                            <th>Actions</th>
                         </tr>
-                    `;
-                });
-                
-                html += `
-                            </tbody>
-                        </table>
-                    </div>
-                    <p class="text-muted">Total: ${data.users.length} users</p>
-                `;
-                
-                container.innerHTML = html;
-                container.style.display = 'block';
+                    </thead>
+                    <tbody id="usersList">
+                        <!-- Users will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        <div id="errorMessage" class="alert alert-danger" style="display: none;">
+            <i class="fas fa-exclamation-triangle"></i> <span id="errorText"></span>
+        </div>
+
+        <!-- Empty Message -->
+        <div id="emptyMessage" class="alert alert-info" style="display: none;">
+            <i class="fas fa-info-circle"></i> No users found.
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+//  COMPLETE WORKING SCRIPT - WITH EDIT & DELETE FUNCTIONALITY
+// ============================================================
+
+const API_BASE = 'https://product-polarization-analyzer-production.up.railway.app';
+const currentUser = localStorage.getItem('username') || '';
+
+console.log('👤 Current User:', currentUser);
+console.log('🔑 Token:', localStorage.getItem('token'));
+
+// ============================================================
+//  LOAD USERS
+// ============================================================
+async function loadUsers() {
+    console.log('🔄 Loading users...');
+
+    const spinner = document.getElementById('loadingSpinner');
+    const table = document.getElementById('usersTable');
+    const error = document.getElementById('errorMessage');
+    const empty = document.getElementById('emptyMessage');
+
+    if (spinner) spinner.style.display = 'block';
+    if (table) table.style.display = 'none';
+    if (error) error.style.display = 'none';
+    if (empty) empty.style.display = 'none';
+
+    try {
+        const response = await fetch(`${API_BASE}/api/manage-users`);
+        const data = await response.json();
+
+        console.log('📦 API Response:', data);
+
+        if (data.status === 'success') {
+            const users = data.users || [];
+            console.log('👥 Users count:', users.length);
+
+            if (users.length === 0) {
+                if (empty) empty.style.display = 'block';
             } else {
-                errorDiv.textContent = 'Failed to load users: ' + (data.message || 'Unknown error');
-                errorDiv.style.display = 'block';
+                displayUsers(users);
+                if (table) table.style.display = 'block';
             }
-        } catch (error) {
-            console.error('❌ Error:', error);
-            errorDiv.textContent = 'Network error: ' + error.message;
-            errorDiv.style.display = 'block';
-        } finally {
-            loading.style.display = 'none';
+        } else {
+            showError(data.message || 'Failed to load users');
         }
+    } catch (error) {
+        console.error('❌ Error:', error);
+        showError(error.message || 'Network error. Please try again.');
+    } finally {
+        if (spinner) spinner.style.display = 'none';
+    }
+}
+
+// ============================================================
+//  DISPLAY USERS WITH EDIT & DELETE BUTTONS
+// ============================================================
+function displayUsers(users) {
+    console.log('🎨 Displaying users:', users);
+
+    const tbody = document.getElementById('usersList');
+    if (!tbody) {
+        console.error('❌ usersList element not found!');
+        return;
     }
 
-    // ✅ Load directly on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('📄 Page loaded');
-        loadUsers();
+    tbody.innerHTML = '';
+
+    users.forEach((user) => {
+        // Role badge class
+        let badgeClass = 'role-user';
+        if (user.role === 'Admin') badgeClass = 'role-admin';
+        else if (user.role === 'Research Analyst') badgeClass = 'role-research';
+        else if (user.role === 'Evaluator') badgeClass = 'role-evaluator';
+
+        const isCurrentUser = user.username === currentUser;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${user.id}</td>
+            <td><strong>${user.username}</strong></td>
+            <td>${user.email || 'N/A'}</td>
+            <td>
+                <span class="role-badge ${badgeClass}">${user.role || 'User'}</span>
+            </td>
+            <td>
+                <select class="role-select" data-userid="${user.id}">
+                    <option value="User" ${user.role === 'User' ? 'selected' : ''}>User</option>
+                    <option value="Research Analyst" ${user.role === 'Research Analyst' ? 'selected' : ''}>Research Analyst</option>
+                    <option value="Evaluator" ${user.role === 'Evaluator' ? 'selected' : ''}>Evaluator</option>
+                    <option value="Admin" ${user.role === 'Admin' ? 'selected' : ''}>Admin</option>
+                </select>
+                <button class="btn-primary" onclick="updateRole(${user.id})">
+                    <i class="fas fa-check"></i> Update
+                </button>
+            </td>
+            <td>
+                ${isCurrentUser ?
+                    `<span class="text-muted"><i class="fas fa-lock"></i> You</span>` :
+                    `<button class="btn-danger" onclick="deleteUser(${user.id}, '${user.username}')">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>`
+                }
+            </td>
+        `;
+        tbody.appendChild(tr);
     });
-    </script>
+
+    console.log(`✅ Displayed ${users.length} users`);
+}
+
+// ============================================================
+//  UPDATE USER ROLE
+// ============================================================
+async function updateRole(userId) {
+    const select = document.querySelector(`.role-select[data-userid="${userId}"]`);
+    if (!select) return;
+
+    const newRole = select.value;
+
+    if (!confirm(`Change this user's role to "${newRole}"?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/manage-users/${userId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role: newRole })
+        });
+
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            alert('✅ User role updated!');
+            loadUsers();
+        } else {
+            alert('❌ Failed: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error updating user');
+    }
+}
+
+// ============================================================
+//  DELETE USER
+// ============================================================
+async function deleteUser(userId, username) {
+    if (!confirm(`⚠️ Delete "${username}"? This cannot be undone!`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/manage-users/${userId}`, {
+            method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            alert('✅ User deleted!');
+            loadUsers();
+        } else {
+            alert('❌ Failed: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error deleting user');
+    }
+}
+
+// ============================================================
+//  REFRESH
+// ============================================================
+function refreshUsers() {
+    loadUsers();
+}
+
+// ============================================================
+//  SHOW ERROR
+// ============================================================
+function showError(message) {
+    const errorText = document.getElementById('errorText');
+    const errorMessage = document.getElementById('errorMessage');
+    if (errorText) errorText.textContent = message;
+    if (errorMessage) errorMessage.style.display = 'block';
+}
+
+// ============================================================
+//  LOAD ON PAGE LOAD
+// ============================================================
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('📄 Page loaded');
+    console.log('🔑 Token exists:', !!localStorage.getItem('token'));
+    console.log('👤 Username:', localStorage.getItem('username'));
+
+    loadUsers();
+});
+</script>
+
 </body>
 </html>
