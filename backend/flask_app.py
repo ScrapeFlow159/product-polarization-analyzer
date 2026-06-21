@@ -153,7 +153,7 @@ def api_login():
     # Store OTP details inside the server context cache mapped directly against their unique username identifier
     OTP_STORE[username] = {
         "otp": otp,
-        "expires_at": datetime.now() + timedelta(minutes=5),
+        "expires_at": datetime.utcnow() + timedelta(minutes=10) , # ← Use UTC
         "role": role
     }
     
