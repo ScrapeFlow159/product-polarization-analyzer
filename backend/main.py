@@ -53,6 +53,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+print("Flask app mounted successfully on /auth")
 # Data models
 class Product(BaseModel):
     name: str
@@ -315,7 +317,7 @@ def test():
 
 
 # ✅ THEN mount Flask app
-app.mount("/", WSGIMiddleware(flask_app))
+app.mount("/auth", WSGIMiddleware(flask_app))
 
 
 
