@@ -2161,6 +2161,24 @@ async function analyzeWeeklyCustomWeek() {
     
     const days = document.getElementById('weeklyWeekDaysSelect').value;
     
+    // ✅ ADD: Get user info and parameters
+    const username = localStorage.getItem('username') || 'haroon';
+    const role = localStorage.getItem('role') || 'User';
+    const token = localStorage.getItem('token');
+    
+    // ✅ ADD: Fetch saved parameters for Research Analyst
+    let k_value = 3;
+    let weights = { price: 1.0, rating: 1.0, reviews: 1.0, popularity: 1.0 };
+    
+    if (role === 'Research Analyst') {
+        const savedParams = await fetchSavedParameters();
+        if (savedParams) {
+            k_value = savedParams.k_value || 3;
+            weights = savedParams.weights || weights;
+            console.log('🔬 Research Analyst - Custom K:', k_value);
+        }
+    }
+    
     // Show tabs container
     const tabsContainer = document.getElementById('weeklyCustomTabs');
     const tabContentsContainer = document.getElementById('weeklyCustomTabContents');
@@ -2200,29 +2218,43 @@ async function analyzeWeeklyCustomWeek() {
         const categoryDisplay = category.replace(/_/g, ' ').split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
         
         try {
-            const response = await fetch(`${API_BASE_URL}/api/analyze-custom`, {
+            // ✅ FIXED: Add username, role, k_value, weights
+            const response = await fetch(`${API_BASE_URL}/api/analyze-custom?username=${username}&role=${role}`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     platform: platform,
                     category: category,
                     unit: 'days',
                     duration: parseInt(days),
-                    max_products: 50
+                    max_products: 50,
+                    k_value: k_value,      // ✅ ADD
+                    weights: weights       // ✅ ADD
                 })
             });
             
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `HTTP ${response.status}`);
+            }
+            
             const data = await response.json();
+            console.log('📦 Custom Week Data:', data);  // ✅ Debug
             customResults[category] = data;
             
             // Store graph data globally
             if (!window.customGraphData) window.customGraphData = {};
             if (!window.customGraphData['weekly']) window.customGraphData['weekly'] = {};
-            // Store graph data globally with platform
-window.customGraphData['weekly'][category] = {
-    ...data,
-    platform: platform  // ← Add this line
-};
+            // Store graph data globally with platform and category
+            window.customGraphData['weekly'][category] = {
+                ...data,
+                platform: platform,
+                category: category  // ✅ ADD category
+            };
+            
             // Update tab button text
             const tabs = document.querySelectorAll('#weeklyCustomTabs .result-tab');
             if (tabs[i]) {
@@ -2236,6 +2268,7 @@ window.customGraphData['weekly'][category] = {
             }
             
         } catch (error) {
+            console.error('❌ Custom Week Error:', error);
             const tabContentDiv = document.getElementById(`weeklyCustomTab_${category}`);
             if (tabContentDiv) {
                 tabContentDiv.innerHTML = `<div style="background: #fee2e2; padding: 15px; border-radius: 12px;">Error: ${error.message}</div>`;
@@ -2404,6 +2437,24 @@ async function analyzeMonthlyCustomMonth() {
     
     const weeks = document.getElementById('monthlyMonthWeeksSelect').value;
     
+    // ✅ ADD: Get user info and parameters
+    const username = localStorage.getItem('username') || 'haroon';
+    const role = localStorage.getItem('role') || 'User';
+    const token = localStorage.getItem('token');
+    
+    // ✅ ADD: Fetch saved parameters for Research Analyst
+    let k_value = 3;
+    let weights = { price: 1.0, rating: 1.0, reviews: 1.0, popularity: 1.0 };
+    
+    if (role === 'Research Analyst') {
+        const savedParams = await fetchSavedParameters();
+        if (savedParams) {
+            k_value = savedParams.k_value || 3;
+            weights = savedParams.weights || weights;
+            console.log('🔬 Research Analyst - Custom K:', k_value);
+        }
+    }
+    
     // Show tabs container
     const tabsContainer = document.getElementById('monthlyCustomTabs');
     const tabContentsContainer = document.getElementById('monthlyCustomTabContents');
@@ -2412,12 +2463,10 @@ async function analyzeMonthlyCustomMonth() {
     tabsContainer.innerHTML = '';
     tabContentsContainer.innerHTML = '';
     
-    // Create tabs and loading placeholders for each category
     for (let i = 0; i < monthlyState.selected.length; i++) {
         const category = monthlyState.selected[i];
         const categoryDisplay = category.replace(/_/g, ' ').split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
         
-        // Add tab button
         const tabBtn = document.createElement('button');
         tabBtn.className = `result-tab ${i === 0 ? 'active' : ''}`;
         tabBtn.textContent = `${categoryDisplay} (Loading...)`;
@@ -2426,7 +2475,6 @@ async function analyzeMonthlyCustomMonth() {
         })(category);
         tabsContainer.appendChild(tabBtn);
         
-        // Add loading content
         const tabContent = document.createElement('div');
         tabContent.id = `monthlyCustomTab_${category}`;
         tabContent.className = `tab-content ${i === 0 ? 'active' : ''}`;
@@ -2434,44 +2482,57 @@ async function analyzeMonthlyCustomMonth() {
         tabContentsContainer.appendChild(tabContent);
     }
     
-    // Fetch data for each category
     for (let i = 0; i < monthlyState.selected.length; i++) {
         const category = monthlyState.selected[i];
         const categoryDisplay = category.replace(/_/g, ' ').split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
         
         try {
-            const response = await fetch(`${API_BASE_URL}/api/analyze-custom`, {
+            // ✅ FIXED: Add username, role, k_value, weights
+            const response = await fetch(`${API_BASE_URL}/api/analyze-custom?username=${username}&role=${role}`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     platform: platform,
                     category: category,
                     unit: 'weeks',
                     duration: parseInt(weeks),
-                    max_products: 50
+                    max_products: 50,
+                    k_value: k_value,      // ✅ ADD
+                    weights: weights       // ✅ ADD
                 })
             });
             
-            const data = await response.json();
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || `HTTP ${response.status}`);
+            }
             
-            // Store graph data globally
+            const data = await response.json();
+            console.log('📦 Custom Month Data:', data);
+            
             if (!window.customGraphData) window.customGraphData = {};
             if (!window.customGraphData['monthly']) window.customGraphData['monthly'] = {};
-            window.customGraphData['monthly'][category] = data;
+            window.customGraphData['monthly'][category] = {
+                ...data,
+                platform: platform,
+                category: category  // ✅ ADD
+            };
             
-            // Update tab button text
             const tabs = document.querySelectorAll('#monthlyCustomTabs .result-tab');
             if (tabs[i]) {
                 tabs[i].textContent = `${categoryDisplay} (${data.avg_polarization_score})`;
             }
             
-            // Update tab content
             const tabContentDiv = document.getElementById(`monthlyCustomTab_${category}`);
             if (tabContentDiv) {
                 tabContentDiv.innerHTML = generateCustomGraphHTMLWithoutChart(data, categoryDisplay);
             }
             
         } catch (error) {
+            console.error('❌ Custom Month Error:', error);
             const tabContentDiv = document.getElementById(`monthlyCustomTab_${category}`);
             if (tabContentDiv) {
                 tabContentDiv.innerHTML = `<div style="background: #fee2e2; padding: 15px; border-radius: 12px;">Error: ${error.message}</div>`;
@@ -2479,14 +2540,13 @@ async function analyzeMonthlyCustomMonth() {
         }
     }
     
-    // Initialize chart for first category
     setTimeout(() => {
         if (monthlyState.selected.length > 0) {
             initializeGraphInTab('monthly', monthlyState.selected[0]);
         }
     }, 200);
 }
-        function displayResults(page) {
+function displayResults(page) {
             const state = getState(page);
             const categories = state.selected;
             if (categories.length === 0) return;
