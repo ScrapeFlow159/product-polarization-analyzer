@@ -53,6 +53,71 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
 )
 
+# Data models
+class Product(BaseModel):
+    name: str
+    price: float
+    rating: float
+    reviews: int
+    popularity_score: float
+    cluster: int
+    cluster_label: str
+    seller: Optional[str] = None
+    brand: Optional[str] = None
+
+class PolarizationAnalysis(BaseModel):
+    platform: str
+    total_products: int
+    polarization_score: float
+    polarization_level: str
+    clusters: List[Dict]
+    products: List[Product]
+    feature_importance: Dict[str, float]
+    analysis_timestamp: str
+    data_source: str
+    csv_file_used: str
+    silhouette_score: float
+    analysis_type: Optional[str] = "current"
+
+class TimeComparisonResponse(BaseModel):
+    current: Optional[Dict]
+    weekly_avg: Optional[float]
+    monthly_avg: Optional[float]
+    weekly_trend: Optional[str]
+    monthly_trend: Optional[str]
+    historical_data: Dict
+
+class AnalysisRequest(BaseModel):
+    platform: str
+    category: str
+    subcategory: str
+    max_products: Optional[int] = 100
+    analysis_type: Optional[str] = "current"  # current, weekly, monthly
+    save_to_db: Optional[bool] = True
+
+class CustomAnalysisRequest(BaseModel):
+    platform: str
+    category: str
+    unit: str  # 'days' ya 'weeks'
+    duration: int  # 3,5,7 for days / 2,3,4 for weeks
+    max_products: Optional[int] = 50
+
+class AnalysisParams(BaseModel):
+    k_value: int = 3
+    price_weight: float = 1.0
+    rating_weight: float = 1.0
+    reviews_weight: float = 1.0
+    popularity_weight: float = 1.0
+
+class AnalysisParams(BaseModel):
+    k_value: int = 3
+    price_weight: float = 1.0
+    rating_weight: float = 1.0
+    reviews_weight: float = 1.0
+    popularity_weight: float = 1.0
+
+
+
 
 @app.post("/api/analyze")
 async def analyze_polarization(
@@ -402,61 +467,7 @@ async def export_results(
 
 
 
-# Data models
-class Product(BaseModel):
-    name: str
-    price: float
-    rating: float
-    reviews: int
-    popularity_score: float
-    cluster: int
-    cluster_label: str
-    seller: Optional[str] = None
-    brand: Optional[str] = None
 
-class PolarizationAnalysis(BaseModel):
-    platform: str
-    total_products: int
-    polarization_score: float
-    polarization_level: str
-    clusters: List[Dict]
-    products: List[Product]
-    feature_importance: Dict[str, float]
-    analysis_timestamp: str
-    data_source: str
-    csv_file_used: str
-    silhouette_score: float
-    analysis_type: Optional[str] = "current"
-
-class TimeComparisonResponse(BaseModel):
-    current: Optional[Dict]
-    weekly_avg: Optional[float]
-    monthly_avg: Optional[float]
-    weekly_trend: Optional[str]
-    monthly_trend: Optional[str]
-    historical_data: Dict
-
-class AnalysisRequest(BaseModel):
-    platform: str
-    category: str
-    subcategory: str
-    max_products: Optional[int] = 100
-    analysis_type: Optional[str] = "current"  # current, weekly, monthly
-    save_to_db: Optional[bool] = True
-
-class CustomAnalysisRequest(BaseModel):
-    platform: str
-    category: str
-    unit: str  # 'days' ya 'weeks'
-    duration: int  # 3,5,7 for days / 2,3,4 for weeks
-    max_products: Optional[int] = 50
-
-class AnalysisParams(BaseModel):
-    k_value: int = 3
-    price_weight: float = 1.0
-    rating_weight: float = 1.0
-    reviews_weight: float = 1.0
-    popularity_weight: float = 1.0
 
 # Store parameters in session (temporary)
 analysis_params = {
@@ -499,47 +510,8 @@ async def get_parameters(username: str = None, role: str = None):
     return default_params
 
 
-class AnalysisParams(BaseModel):
-    k_value: int = 3
-    price_weight: float = 1.0
-    rating_weight: float = 1.0
-    reviews_weight: float = 1.0
-    popularity_weight: float = 1.0
 
 
-@app.post("/api/set-params")
-async def set_parameters(
-    params: AnalysisParams, 
-    username: str = None, 
-    role: str = None
-):
-    """Set analysis parameters - ONLY for Research Analyst"""
-    print(f"📊 Set params called: username={username}, role={role}")
-    print(f"   Params: k={params.k_value}, weights=[{params.price_weight}, {params.rating_weight}, {params.reviews_weight}, {params.popularity_weight}]")
-    
-    # ✅ Strict role check
-    if role != "Research Analyst":
-        raise HTTPException(
-            status_code=403, 
-            detail="Access denied. Only Research Analyst can adjust parameters."
-        )
-    
-    if not username:
-        raise HTTPException(status_code=401, detail="Username required")
-    
-    # Save parameters for this Research Analyst
-    research_analyst_params[username] = {
-        "k_value": params.k_value,
-        "weights": {
-            "price": params.price_weight,
-            "rating": params.rating_weight,
-            "reviews": params.reviews_weight,
-            "popularity": params.popularity_weight
-        }
-    }
-    
-    print(f"✅ Parameters saved for {username}")
-    return {"message": "Parameters updated successfully", "params": research_analyst_params[username]}
 @app.post("/api/set-params")
 async def set_parameters(params: AnalysisParams):
     """Set analysis parameters for Research Analyst"""
