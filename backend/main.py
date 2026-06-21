@@ -315,7 +315,7 @@ def test():
 
 
 # ✅ THEN mount Flask app
-app.mount("/auth", WSGIMiddleware(flask_app))
+app.mount("/", WSGIMiddleware(flask_app))
 
 
 
