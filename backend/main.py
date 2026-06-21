@@ -258,6 +258,8 @@ class CustomAnalysisRequest(BaseModel):
     unit: str  # 'days' ya 'weeks'
     duration: int  # 3,5,7 for days / 2,3,4 for weeks
     max_products: Optional[int] = 50
+    k_value: Optional[int] = 3  # ✅ ADD THIS
+    weights: Optional[Dict[str, float]] = None  # ✅ ADD THIS
 
 class AnalysisParams(BaseModel):
     k_value: int = 3
@@ -1062,7 +1064,11 @@ def get_polarization_level(score):
         return "Very High Polarization"
     
 @app.post("/api/analyze-custom")
-async def analyze_custom_duration(request: CustomAnalysisRequest):
+async def analyze_custom_duration(
+    request: CustomAnalysisRequest,
+    username: str = None,
+    role: str = None
+):
     """
     Custom duration analysis
     request.unit = 'days' ya 'weeks'
@@ -1073,6 +1079,24 @@ async def analyze_custom_duration(request: CustomAnalysisRequest):
     category = request.category.lower()
     unit = request.unit
     duration = request.duration
+
+    # ✅ GET CUSTOM PARAMETERS FROM REQUEST
+    custom_k = request.k_value if request.k_value else 3
+    weights = request.weights if request.weights else {
+        "price": 1.0, "rating": 1.0, "reviews": 1.0, "popularity": 1.0
+    }
+    
+    # ✅ AGAR RESEARCH ANALYST HAI TOH SAVED PARAMS USE KAREIN
+    if role == "Research Analyst" and username and username in research_analyst_params:
+        saved_k = research_analyst_params[username].get("k_value")
+        saved_weights = research_analyst_params[username].get("weights")
+        if custom_k == 3 and saved_k:
+            custom_k = saved_k
+        if weights == {"price": 1.0, "rating": 1.0, "reviews": 1.0, "popularity": 1.0}:
+            if saved_weights:
+                weights = saved_weights
+    
+    print(f"📊 CUSTOM ANALYSIS: k={custom_k}, weights={weights}")
 
     if platform == "daraz":
         platform = "Daraz.pk"
@@ -1188,7 +1212,6 @@ async def analyze_custom_duration(request: CustomAnalysisRequest):
     print(f"✅ Returning {result['data_points']} days, scores: {result['daily_scores']}")
     print(f"📅 Start: {result['start_date']}, End: {result['end_date']}")
     return result
-
 async def calculate_from_csv(platform, category):
     """Fallback function jab database mein data nahi ho"""
     # Create a request object
@@ -1224,20 +1247,45 @@ async def calculate_from_csv(platform, category):
 async def get_comparison(platform: str, category: str):
     """Get comparison between current, weekly, and monthly polarization"""
     try:
+        from database import get_polarization_comparison, get_all_historical_data
+        
+        # ✅ Try to get current analysis
+        current_data = get_current_analysis(platform, category)
+        
+        # ✅ Agar current data nahi hai toh default return karein
+        if not current_data:
+            return {
+                "current": None,
+                "weekly_avg": None,
+                "monthly_avg": None,
+                "weekly_trend": "No data",
+                "monthly_trend": "No data",
+                "historical_data": {}
+            }
+        
         comparison = get_polarization_comparison(platform, category)
         historical = get_all_historical_data(platform, category)
         
-        return TimeComparisonResponse(
-            current=get_current_analysis(platform, category),
-            weekly_avg=comparison['weekly_avg'],
-            monthly_avg=comparison['monthly_avg'],
-            weekly_trend=comparison['weekly_trend'],
-            monthly_trend=comparison['monthly_trend'],
-            historical_data=historical
-        )
+        return {
+            "current": current_data,
+            "weekly_avg": comparison.get('weekly_avg'),
+            "monthly_avg": comparison.get('monthly_avg'),
+            "weekly_trend": comparison.get('weekly_trend', 'Stable'),
+            "monthly_trend": comparison.get('monthly_trend', 'Stable'),
+            "historical_data": historical or {}
+        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+        print(f"❌ Comparison error: {e}")
+        # ✅ Error ke bajaye default response return karein
+        return {
+            "current": None,
+            "weekly_avg": None,
+            "monthly_avg": None,
+            "weekly_trend": "No data",
+            "monthly_trend": "No data",
+            "historical_data": {},
+            "error": str(e)
+        }
 
 @app.get("/api/daily-products/{platform}/{category}/{date}")
 async def get_daily_products(platform: str, category: str, date: str):
