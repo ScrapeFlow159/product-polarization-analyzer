@@ -987,17 +987,15 @@ if (!token || token === "null" || token === "undefined") {
 // ==========================================
 async function analyzeCurrentPolarization(selectedCategories, platform) {
 
-    let backendPlatform;
-    const p = platform.toLowerCase();
+    // Platform logic ko update karein:
+     let backendPlatform = platform.toUpperCase(); // Force Uppercase!
 
-    if (p.includes('daraz')) {
-        backendPlatform = 'Daraz.pk';
-    } else if (p.includes('etsy')) {
-        backendPlatform = 'Etsy.com';
-    } else {
-        backendPlatform = platform; 
+     // Agar log mein DARAZ.PK hai, to check karein:
+    if (backendPlatform.includes('DARAZ')) {
+        backendPlatform = 'DARAZ.PK';
+    } else if (backendPlatform.includes('ETSY')) {
+        backendPlatform = 'ETSY.COM';
     }
-    
     console.log("Final Platform sent to backend:", backendPlatform);
     if (!selectedCategories || selectedCategories.length === 0) {
         alert("Please select at least one category.");
