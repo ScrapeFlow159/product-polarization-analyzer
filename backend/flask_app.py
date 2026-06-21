@@ -156,7 +156,7 @@ def api_login():
         "expires_at": datetime.now() + timedelta(minutes=5),
         "role": role
     }
-       time.sleep(0.1)
+    
     
     return jsonify({"status": "success", "message": "OTP sent to your email"}), 200
 
