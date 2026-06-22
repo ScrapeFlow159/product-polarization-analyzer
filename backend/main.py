@@ -208,6 +208,48 @@ async def health_check():
         }
     except Exception as e:
         return {"status": "unhealthy", "error": str(e)}, 500
+def save_user_params(username, k_value, weights):
+    """Save user parameters to database"""
+    conn = sqlite3.connect(USERS_DB_PATH)
+    cursor = conn.cursor()
+    
+    # Create table if not exists
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_params (
+            username TEXT PRIMARY KEY,
+            k_value INTEGER,
+            weights TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    
+    # Save params
+    cursor.execute(
+        "INSERT OR REPLACE INTO user_params (username, k_value, weights) VALUES (?, ?, ?)",
+        (username, k_value, json.dumps(weights))
+    )
+    conn.commit()
+    conn.close()
+    print(f"✅ Saved params to database for {username}: K={k_value}")
+
+def get_user_params(username):
+    """Get user parameters from database"""
+    conn = sqlite3.connect(USERS_DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        "SELECT k_value, weights FROM user_params WHERE username = ?",
+        (username,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    
+    if row:
+        return {
+            "k_value": row[0],
+            "weights": json.loads(row[1])
+        }
+    return None
 # Data models
 class Product(BaseModel):
     name: str
@@ -665,7 +707,6 @@ async def get_parameters(username: str = None, role: str = None):
     """Get current parameters for the user"""
     print(f"📊 Get params called: username={username}, role={role}")
     
-    # Default parameters for all users
     default_params = {
         "k_value": 3,
         "weights": {
@@ -676,18 +717,23 @@ async def get_parameters(username: str = None, role: str = None):
         }
     }
     
-    # Only Research Analyst can have custom parameters
     if username and role and role.lower() == "research analyst":
+        # ✅ Try memory first
         if username in research_analyst_params:
-            print(f"✅ Returning custom params for {username}")
+            print(f"✅ Found in memory for {username}")
             return research_analyst_params[username]
-        else:
-            print(f"⚠️ No custom params found for {username}, returning default")
+        
+        # ✅ Try database
+        db_params = get_user_params(username)
+        if db_params:
+            print(f"✅ Found in database for {username}")
+            # Store in memory for future
+            research_analyst_params[username] = db_params
+            return db_params
+        
+        print(f"⚠️ No params found for {username}")
     
-    print(f"✅ Returning default params for {role}")
     return default_params
-
-
 
 @app.post("/api/set-params")
 async def set_parameters(
@@ -696,28 +742,29 @@ async def set_parameters(
     role: str = None
 ):
     """Set analysis parameters for Research Analyst"""
-    global analysis_params, research_analyst_params
+    global analysis_params
     
     print(f"📊 Set params called: username={username}, role={role}")
     
+    # Update memory
     analysis_params["k_value"] = params.k_value
     analysis_params["weights"]["price"] = params.price_weight
     analysis_params["weights"]["rating"] = params.rating_weight
     analysis_params["weights"]["reviews"] = params.reviews_weight
     analysis_params["weights"]["popularity"] = params.popularity_weight
     
-    # ✅ Store for specific user if Research Analyst
+    # ✅ Save to database
     if username and role and role.lower() == "research analyst":
-        research_analyst_params[username] = {
-            "k_value": params.k_value,
-            "weights": {
+        save_user_params(
+            username,
+            params.k_value,
+            {
                 "price": params.price_weight,
                 "rating": params.rating_weight,
                 "reviews": params.reviews_weight,
                 "popularity": params.popularity_weight
             }
-        }
-        print(f"✅ Stored custom params for {username}")
+        )
     
     return {
         "status": "success",
