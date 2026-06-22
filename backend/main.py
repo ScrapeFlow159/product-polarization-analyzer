@@ -301,18 +301,21 @@ async def analyze_polarization(
 }
         
         # ✅ Priority 2: Agar request mein nahi hain toh research_analyst_params se lein
-        if role == "Research Analyst" and username and username in research_analyst_params:
-            saved_k = research_analyst_params[username].get("k_value")
-            saved_weights = research_analyst_params[username].get("weights")
+        if username and role and role.lower() == "research analyst":
+            saved_k = None
+            saved_weights = None
+            if username in research_analyst_params:
+                saved_k = research_analyst_params[username].get("k_value")
+                saved_weights = research_analyst_params[username].get("weights")
             
             # Sirf tab override karein jab request mein nahi bheja gaya ho
             if custom_k == 3 and saved_k:
                 custom_k = saved_k
                 print(f"📊 Using saved K from params: {custom_k}")
-            if not weights or weights == {"price": 1.0, "rating": 1.0, "reviews": 1.0, "popularity": 1.0}:
-                if saved_weights:
-                    weights = saved_weights
-                    print(f"📊 Using saved weights from params: {weights}")
+            if weights == {"price": 1.0, "rating": 1.0, "reviews": 1.0, "popularity": 1.0}:
+                    if saved_weights:
+                        weights = saved_weights
+                        print(f"📊 Using saved weights from params: {weights}")
         
         print(f"📊 FINAL PARAMETERS: k={custom_k}, weights={weights}")
         
@@ -674,13 +677,15 @@ async def get_parameters(username: str = None, role: str = None):
     }
     
     # Only Research Analyst can have custom parameters
-    if role == "Research Analyst" and username and username in research_analyst_params:
-        print(f"✅ Returning custom params for {username}")
-        return research_analyst_params[username]
+    if username and role and role.lower() == "research analyst":
+        if username in research_analyst_params:
+            print(f"✅ Returning custom params for {username}")
+            return research_analyst_params[username]
+        else:
+            print(f"⚠️ No custom params found for {username}, returning default")
     
     print(f"✅ Returning default params for {role}")
     return default_params
-
 
 
 
@@ -702,7 +707,7 @@ async def set_parameters(
     analysis_params["weights"]["popularity"] = params.popularity_weight
     
     # ✅ Store for specific user if Research Analyst
-    if role == "Research Analyst" and username:
+    if username and role and role.lower() == "research analyst":
         research_analyst_params[username] = {
             "k_value": params.k_value,
             "weights": {
@@ -1291,6 +1296,22 @@ async def get_comparison(platform: str, category: str):
         
         comparison = get_polarization_comparison(platform, category)
         historical = get_all_historical_data(platform, category)
+
+        weekly_avg = comparison.get('weekly_avg')
+        monthly_avg = comparison.get('monthly_avg')
+        
+        # ✅ Convert to float if needed
+        if weekly_avg is not None:
+            try:
+                weekly_avg = float(weekly_avg)
+            except (ValueError, TypeError):
+                weekly_avg = None
+        
+        if monthly_avg is not None:
+            try:
+                monthly_avg = float(monthly_avg)
+            except (ValueError, TypeError):
+                monthly_avg = None
         
         return {
             "current": current_data,

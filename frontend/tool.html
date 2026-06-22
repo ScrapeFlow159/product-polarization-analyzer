@@ -960,8 +960,9 @@ let rawUsername = urlParams.get('username') || localStorage.getItem('username') 
 const username = rawUsername.trim().toLowerCase(); // Automatic converts "Haroon" to "haroon"
 
 let rawRole = urlParams.get('role') || localStorage.getItem('role') || 'User';
-const role = rawRole.trim().charAt(0).toUpperCase() + rawRole.trim().slice(1).toLowerCase(); // Strictly sets "User"
-
+const role = rawRole.trim().split(' ').map(word => 
+    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+).join(' ');
 // LocalStorage Synchronization
 localStorage.setItem('username', username);
 localStorage.setItem('role', role);
