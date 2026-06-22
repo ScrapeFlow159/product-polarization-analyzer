@@ -1014,7 +1014,7 @@ async function analyzeCurrentPolarization(selectedCategories, platform) {
             popularity: 1.0
         };
         
-        if (role === 'Research Analyst') {
+        if (role && role.toLowerCase() === 'research analyst') {
             const savedParams = await fetchSavedParameters();
             if (savedParams) {
                 k_value = savedParams.k_value || 3;
@@ -2027,14 +2027,12 @@ async function runAnalysis(page) {
     const state = getState(page);
     if (!state || !state.selected || state.selected.length === 0) return;
     
-    // ✅ Disable button to prevent multiple clicks
     const analyzeBtn = document.getElementById(`${page}AnalyzeBtn`);
     if (analyzeBtn && analyzeBtn.disabled) return;
     if (analyzeBtn) analyzeBtn.disabled = true;
     
     try {
         setLoading(page, true);
-        
         updateStep(page, 1);
         await simulateProcessing(page);
         
@@ -2043,7 +2041,6 @@ async function runAnalysis(page) {
         if (page === 'monthly') analysisType = 'monthly';
         
         const backendPlatform = state.platform;
-        
         const activeUsername = (localStorage.getItem('username') || 'haroon').trim().toLowerCase();
         const activeRole = (localStorage.getItem('role') || 'User').trim();
         const activeToken = localStorage.getItem('token') || token;
@@ -2057,7 +2054,7 @@ async function runAnalysis(page) {
             popularity: 1.0
         };
         
-        if (activeRole === 'Research Analyst') {
+        if (activeRole.toLowerCase() === 'research analyst') {
             const savedParams = await fetchSavedParameters();
             if (savedParams) {
                 k_value = savedParams.k_value || 3;
@@ -2091,7 +2088,6 @@ async function runAnalysis(page) {
                     max_products: 50,
                     analysis_type: analysisType,
                     save_to_db: true,
-                    // ✅ FIXED: Send K-value and weights
                     k_value: k_value,
                     weights: weights
                 })
@@ -2130,6 +2126,10 @@ async function runAnalysis(page) {
                 console.error("Comparison data error:", e); 
             }
         }
+        
+        // ✅ ========== FIX: Store k_value in state ==========
+        state.k_value = k_value;           // ✅ ADD THIS
+        state.weights = weights;           // ✅ ADD THIS
         
         setState(page, state);
         displayResults(page);
@@ -2170,7 +2170,7 @@ async function analyzeWeeklyCustomWeek() {
     let k_value = 3;
     let weights = { price: 1.0, rating: 1.0, reviews: 1.0, popularity: 1.0 };
     
-    if (role === 'Research Analyst') {
+    if (role && role.toLowerCase() === 'research analyst') {
         const savedParams = await fetchSavedParameters();
         if (savedParams) {
             k_value = savedParams.k_value || 3;
@@ -2446,7 +2446,7 @@ async function analyzeMonthlyCustomMonth() {
     let k_value = 3;
     let weights = { price: 1.0, rating: 1.0, reviews: 1.0, popularity: 1.0 };
     
-    if (role === 'Research Analyst') {
+    if (role && role.toLowerCase() === 'research analyst') {
         const savedParams = await fetchSavedParameters();
         if (savedParams) {
             k_value = savedParams.k_value || 3;
@@ -2861,7 +2861,7 @@ async function fetchSavedParameters() {
         const token = localStorage.getItem('token');
         
         // ✅ ONLY Research Analyst can use saved parameters
-        if (role !== 'Research Analyst') {
+        if (role.toLowerCase() !== 'research analyst') {
             console.log('👤 User role:', role, '- Using default parameters');
             return null;
         }
