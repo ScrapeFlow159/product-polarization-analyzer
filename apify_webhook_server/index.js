@@ -8,8 +8,8 @@ app.use(bodyParser.json());
 const APIFY_TOKEN = "apify_api_HlY6edMSwNJqptH4B2FWttNUIIbHKV0z1JTy";
 
 // ✅ BACKEND URL (Railway backend ka URL)
-const BACKEND_URL = "https://product-polarization-analyzer-production.up.railway.app/api/apify-webhook";
-
+// ✅ Railway internal URL (public URL ki jagah)
+const BACKEND_URL = process.env.BACKEND_URL || "http://product-polarization-analyzer-production:8000/api/apify-webhook";
 // Error handlers
 process.on('uncaughtException', (err) => {
     console.log('⚠️ Uncaught Exception:', err.message);
@@ -72,7 +72,7 @@ app.post("/webhook/apify/daraz", async (req, res) => {
             products: items,
             count: items.length,
             platform: "daraz"
-        });
+        }, { timeout: 60000 });  // ✅ 60 seconds timeout
 
         console.log(`✅ Forwarded ${items.length} items to backend`);
         console.log(`   Backend response: ${response.status}`);
