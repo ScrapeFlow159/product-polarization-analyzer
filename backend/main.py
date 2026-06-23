@@ -853,18 +853,118 @@ def load_csv_data():
 
 
 @app.post("/api/apify-webhook")
-async def apify_webhook(request: dict):
-    print("\n🔥 WEBHOOK RECEIVED")
-    print("FULL DATA:")
-    print(request)
+async def apify_webhook(request: dict, background_tasks: BackgroundTasks):
+    """
+    Apify webhook handler - receives data from webhook service and saves CSV
+    """
+    try:
+        print("\n" + "="*60)
+        print("🔥 WEBHOOK RECEIVED FROM APIFY")
+        print("="*60)
+        
+        # ✅ Get data from webhook
+        category = request.get("category", "unknown")
+        products = request.get("products", [])
+        platform = request.get("platform", "daraz")
+        count = request.get("count", 0)
+        
+        print(f"📂 Category: {category}")
+        print(f"📦 Products received: {len(products)}")
+        print(f"📱 Platform: {platform}")
+        
+        if products and len(products) > 0:
+            # ✅ Save CSV in background
+            background_tasks.add_task(save_apify_csv, products, category, platform)
+            
+            return {
+                "status": "success",
+                "message": f"Processing {len(products)} products for {category}",
+                "category": category,
+                "products_count": len(products)
+            }
+        else:
+            # ✅ Try old format (direct from Apify)
+            resource = request.get("resource", {})
+            input_data = resource.get("input", {})
+            category = input_data.get("category", "unknown")
+            
+            # Try to get products from dataset
+            dataset_id = request.get("datasetId") or request.get("dataset_id")
+            if dataset_id:
+                # Fetch from Apify API
+                import requests
+                APIFY_TOKEN = os.getenv("APIFY_TOKEN", "apify_api_HlY6edMSwNJqptH4B2FWttNUIIbHKV0z1JTy")
+                url = f"https://api.apify.com/v2/datasets/{dataset_id}/items?clean=true&token={APIFY_TOKEN}"
+                response = requests.get(url)
+                if response.status_code == 200:
+                    products = response.json()
+                    background_tasks.add_task(save_apify_csv, products, category, platform)
+                    return {
+                        "status": "success",
+                        "message": f"Fetched {len(products)} products from dataset {dataset_id}",
+                        "category": category
+                    }
+            
+            return {
+                "status": "warning",
+                "message": "No products found in webhook data",
+                "category": category
+            }
+            
+    except Exception as e:
+        print(f"❌ Webhook error: {e}")
+        traceback.print_exc()
+        return {"status": "error", "message": str(e)}, 500
 
-    # Extract category (we will use later)
-    category = request.get("resource", {}).get("input", {}).get("category")
 
-    print("CATEGORY RECEIVED:", category)
-
-    return {"status": "received", "category": category}
-
+async def save_apify_csv(products: list, category: str, platform: str):
+    """
+    Save Apify products to CSV and reload in memory
+    """
+    try:
+        import pandas as pd
+        import os
+        
+        print(f"💾 Saving {len(products)} products for {category}...")
+        
+        # Convert to DataFrame
+        df = pd.DataFrame(products)
+        
+        # Clean column names for Daraz/Etsy
+        if platform.lower() == "daraz":
+            # Rename columns if needed
+            if 'name' not in df.columns and 'title' in df.columns:
+                df.rename(columns={'title': 'name'}, inplace=True)
+            if 'price' not in df.columns and 'product_price' in df.columns:
+                df.rename(columns={'product_price': 'price'}, inplace=True)
+            if 'ratingScore' not in df.columns and 'rating' in df.columns:
+                df.rename(columns={'rating': 'ratingScore'}, inplace=True)
+            if 'itemSold' not in df.columns and 'sold' in df.columns:
+                df.rename(columns={'sold': 'itemSold'}, inplace=True)
+        
+        # Save to CSV
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        data_dir = os.path.join(base_dir, "data")
+        os.makedirs(data_dir, exist_ok=True)
+        
+        csv_path = os.path.join(data_dir, f"{category}.csv")
+        df.to_csv(csv_path, index=False)
+        
+        print(f"✅ CSV saved: {csv_path} ({len(df)} products)")
+        
+        # ✅ Reload in memory
+        global DARAZ_DATASETS, ETSY_DATASETS
+        
+        if platform.lower() == "daraz":
+            DARAZ_DATASETS[category] = df.to_dict('records')
+            print(f"✅ Daraz data reloaded: {category} ({len(DARAZ_DATASETS[category])} products)")
+        else:
+            ETSY_DATASETS[category] = df.to_dict('records')
+            print(f"✅ Etsy data reloaded: {category} ({len(ETSY_DATASETS[category])} products)")
+            
+    except Exception as e:
+        print(f"❌ Error saving CSV: {e}")
+        traceback.print_exc()
 load_csv_data()
 
 # Start the background scheduler
