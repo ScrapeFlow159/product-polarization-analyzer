@@ -2025,6 +2025,10 @@ function initCustomAnalysis() {
         }
 
 async function runAnalysis(page) {
+     delete window._cachedParams;
+    
+    // ✅ Fetch fresh from backend
+    const freshParams = await fetchSavedParameters();
     const state = getState(page);
     if (!state || !state.selected || state.selected.length === 0) return;
     
