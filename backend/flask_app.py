@@ -21,7 +21,8 @@ app = Flask(__name__)
 # CORS configuration
 CORS(app, origins=[
     "https://product-polarization-analyzer-135z9naw0.vercel.app",
-    "https://product-polarization-analyzer.vercel.app"
+    "https://product-polarization-analyzer.vercel.app",
+    "*"
 ])
 
 SENDER_EMAIL = "arobaarif271@gmail.com"
