@@ -29,6 +29,7 @@ import sqlite3
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 import os
+import uvicorn
 from pydantic import BaseModel
 
 
@@ -41,17 +42,12 @@ from io import StringIO
 from fastapi.responses import StreamingResponse
 
 # main.py mein ye change karein
-origins = [
-    "https://product-polarization-analyzer-135z9naw0.vercel.app", # Naya URL
-    "https://product-polarization-analyzer.vercel.app" 
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins, # Ab origins list use karein
+    allow_origins=["https://product-polarization-analyzer.vercel.app"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"], # Sab methods allow karein
+    allow_headers=["*"], # Sab headers allow karein
 )
 
 print("Flask app mounted successfully on /auth")
@@ -1552,6 +1548,4 @@ if __name__ == "__main__":
     print("="*60)
     
 port = int(os.environ.get("PORT", 8000)) 
-    
-    # Host ko '0.0.0.0' rakhna hi padega taaki Railway use access kar sake
 uvicorn.run(app, host="0.0.0.0", port=port)
