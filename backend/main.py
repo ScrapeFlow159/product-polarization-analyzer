@@ -43,9 +43,7 @@ from fastapi.responses import StreamingResponse
 # main.py mein ye change karein
 origins = [
     "https://product-polarization-analyzer-135z9naw0.vercel.app", # Naya URL
-    "https://product-polarization-analyzer.vercel.app" ,         # Purana URL bhi rehne dein (just in case)
-    "https://vigilant-essence-apifywebhook.up.railway.app",  # ✅ ADD WEBHOOK DOMAIN
-    "https://apify-webhook.up.railway.app" 
+    "https://product-polarization-analyzer.vercel.app" 
 ]
 
 app.add_middleware(
