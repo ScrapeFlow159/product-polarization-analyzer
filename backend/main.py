@@ -1547,5 +1547,5 @@ if __name__ == "__main__":
     print("\n🚀 Server running at: http://localhost:8000")
     print("="*60)
     
-port = int(os.environ.get("PORT", 8000)) 
+port = int(os.environ.get("PORT", 8080)) 
 uvicorn.run(app, host="0.0.0.0", port=port)
