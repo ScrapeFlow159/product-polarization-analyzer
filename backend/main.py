@@ -342,10 +342,12 @@ async def analyze_polarization(
         if username and role and role.lower() == "research analyst":
             saved_k = None
             saved_weights = None
-            if username in research_analyst_params:
-                saved_k = research_analyst_params[username].get("k_value")
-                saved_weights = research_analyst_params[username].get("weights")
-            
+            db_params = get_user_params(username)
+            if db_params:
+                saved_k = db_params.get("k_value")
+                saved_weights = db_params.get("weights")
+            print(f"📊 Using database params: K={saved_k}")
+        
             # Sirf tab override karein jab request mein nahi bheja gaya ho
             if custom_k == 3 and saved_k:
                 custom_k = saved_k
