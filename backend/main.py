@@ -1551,4 +1551,7 @@ if __name__ == "__main__":
     print("\n🚀 Server running at: http://localhost:8000")
     print("="*60)
     
-#uvicorn.run(app, host="0.0.0.0", port=8000)
+port = int(os.environ.get("PORT", 8000)) 
+    
+    # Host ko '0.0.0.0' rakhna hi padega taaki Railway use access kar sake
+uvicorn.run(app, host="0.0.0.0", port=port)
