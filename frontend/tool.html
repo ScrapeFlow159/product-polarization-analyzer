@@ -2025,10 +2025,7 @@ function initCustomAnalysis() {
         }
 
 async function runAnalysis(page) {
-     delete window._cachedParams;
     
-    // ✅ Fetch fresh from backend
-    const freshParams = await fetchSavedParameters();
     const state = getState(page);
     if (!state || !state.selected || state.selected.length === 0) return;
     
@@ -2059,17 +2056,13 @@ async function runAnalysis(page) {
             popularity: 1.0
         };
         
-        if (activeRole.toLowerCase() === 'research analyst') {
-            const savedParams = await fetchSavedParameters();
-            if (savedParams) {
-                k_value = savedParams.k_value || 3;
-                weights = savedParams.weights || weights;
-                console.log('🔬 Research Analyst - Using custom parameters:', { k_value, weights });
-            } else {
-                console.log('🔬 Research Analyst - Using default parameters (no saved config)');
-            }
+        const savedParams = await fetchSavedParameters();
+        if (savedParams) {
+            k_value = savedParams.k_value || 3;
+            weights = savedParams.weights || weights;
+            console.log('✅ Using custom parameters:', { k_value, weights });
         } else {
-            console.log(`👤 ${activeRole} - Using default parameters`);
+            console.log('⚠️ No saved params, using defaults');
         }
 
         // ✅ STEP 2: Send request with parameters
@@ -2865,38 +2858,27 @@ async function fetchSavedParameters() {
         const role = localStorage.getItem('role') || 'User';
         const token = localStorage.getItem('token');
         
-        // ✅ ONLY Research Analyst can use saved parameters
-        if (role.toLowerCase() !== 'research analyst') {
-            console.log('👤 User role:', role, '- Using default parameters');
-            return null;
-        }
-        
-        console.log('🔬 Research Analyst - Fetching saved parameters...');
-        
-        const url = `${API_BASE_URL}/api/get-params?username=${username}&role=${role}`;
+        // ✅ Add timestamp to bypass cache
+        const url = `${API_BASE_URL}/api/get-params?username=${username}&role=${role}&t=${Date.now()}`;
         
         const response = await fetch(url, {
-            method: 'GET',
-            headers: {
+            headers: { 
                 'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
+                'Cache-Control': 'no-cache'
             }
         });
         
         if (response.ok) {
             const params = await response.json();
-            console.log('📦 Saved Research Analyst Parameters:', params);
+            console.log('📦 Fetched params:', params);
             return params;
-        } else {
-            console.warn('⚠️ Failed to fetch params, using defaults');
-            return null;
         }
+        return null;
     } catch (error) {
         console.error('❌ Error fetching params:', error);
         return null;
     }
 }
-
 // ==========================================
 // DISPLAY USER INFO WITH PARAM STATUS
 // ==========================================
