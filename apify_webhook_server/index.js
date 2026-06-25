@@ -9,8 +9,11 @@ const APIFY_TOKEN = "apify_api_HlY6edMSwNJqptH4B2FWttNUIIbHKV0z1JTy";
 
 // ✅ BACKEND URL (Railway backend ka URL)
 // ✅ Railway internal URL (public URL ki jagah)
-const BACKEND_URL = process.env.BACKEND_URL || "http://product-polarization-analyzer-production:8000/api/apify-webhook";
-// Error handlers
+const BACKEND_URL = process.env.BACKEND_URL; 
+// Agar variable set nahi hai, toh log error de
+if (!BACKEND_URL) {
+    console.error("❌ ERROR: BACKEND_URL environment variable is not set!");
+}
 process.on('uncaughtException', (err) => {
     console.log('⚠️ Uncaught Exception:', err.message);
 });
