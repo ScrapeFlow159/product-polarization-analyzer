@@ -412,14 +412,14 @@ async function updateRole(userId) {
         const data = await response.json();
 
         if (data.status === 'success') {
-            alert('✅ User role updated!');
+            showError('✅ User role updated!');
             loadUsers();
         } else {
-            alert('❌ Failed: ' + data.message);
+            showError('❌ Failed: ' + data.message);
         }
     } catch (error) {
         console.error('Error:', error);
-        alert('❌ Error updating user');
+        showError('❌ Error updating user');
     }
 }
 
@@ -439,14 +439,14 @@ async function deleteUser(userId, username) {
         const data = await response.json();
 
         if (data.status === 'success') {
-            alert('✅ User deleted!');
+            showError('✅ User deleted!');
             loadUsers();
         } else {
-            alert('❌ Failed: ' + data.message);
+            showError('❌ Failed: ' + data.message);
         }
     } catch (error) {
         console.error('Error:', error);
-        alert('❌ Error deleting user');
+        showError('❌ Error deleting user');
     }
 }
 

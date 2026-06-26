@@ -153,11 +153,11 @@ async function loadSettings() {
             document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
             document.getElementById('settingsForm').style.display = 'block';
         } else {
-            alert('Failed to load settings: ' + data.message);
+            show('Failed to load settings: ' + data.message);
         }
     } catch (error) {
         console.error('Error:', error);
-        alert('Error loading settings. Please try again.');
+        showError('Error loading settings. Please try again.');
     } finally {
         document.getElementById('loadingSpinner').style.display = 'none';
     }
@@ -214,6 +214,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     loadSettings();
 });
+
+function showError(message) {
+    const errorDiv = document.getElementById('errorMessage');
+    const errorText = document.getElementById('errorText');
+    if (errorDiv && errorText) {
+        errorDiv.style.display = 'none'; // Reset
+        errorText.textContent = message;
+        errorDiv.style.display = 'block';
+    }
+}
 </script>
 </body>
 </html>

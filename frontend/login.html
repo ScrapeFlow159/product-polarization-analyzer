@@ -84,6 +84,7 @@ function showError(message) {
     const errorDiv = document.getElementById('errorMessage');
     const errorText = document.getElementById('errorText');
     if (errorDiv && errorText) {
+        errorDiv.style.display = 'none'; // Reset
         errorText.textContent = message;
         errorDiv.style.display = 'block';
     }

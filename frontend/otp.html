@@ -52,12 +52,15 @@
     document.getElementById('otpForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        const otpInput = document.querySelector('[name="otp"]');
-        const otp = otpInput.value.trim(); // ✅ Remove spaces
+        // Error ko reset karein
+        document.getElementById('errorMessage').style.display = 'none';
         
-        // ✅ Validate 6-digit number
+        const otpInput = document.querySelector('[name="otp"]');
+        const otp = otpInput.value.trim();
+        
+        // Validate 6-digit
         if (!/^\d{6}$/.test(otp)) {
-            alert('❌ Please enter a valid 6-digit OTP (numbers only)');
+            showError('❌ Please enter a valid 6-digit OTP');
             otpInput.value = '';
             otpInput.focus();
             return;
@@ -65,37 +68,26 @@
         
         const username = localStorage.getItem('username');
         if (!username) {
-            alert('❌ Session expired. Please login again.');
-            window.location.href = '/login.html';
+            showError('❌ Session expired. Please login again.');
+            setTimeout(() => window.location.href = '/login.html', 2000);
             return;
         }
         
         const submitBtn = document.querySelector('button[type="submit"]');
         const spinner = document.getElementById('loadingSpinner');
         
-        // Show loading
-        if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Verifying...';
-        }
-        if (spinner) {
-            spinner.style.display = 'block';
-        }
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Verifying...';
+        spinner.style.display = 'block';
         
         try {
-            console.log('📤 Sending:', { username: username, otp: otp }); // Debug
-            
             const response = await fetch('https://product-polarization-analyzer-production.up.railway.app/auth/verify_otp', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    otp: otp,
-                    username: username
-                })
+                body: JSON.stringify({ otp: otp, username: username })
             });
             
             const data = await response.json();
-            console.log('📦 Response:', data);
             
             if (response.ok && data.status === 'success') {
                 localStorage.setItem('token', data.token);
@@ -103,26 +95,16 @@
                 localStorage.setItem('role', data.role || 'User');
                 window.location.href = '/dashboard.html';
             } else {
-                alert('❌ ' + (data.message || data.detail || 'Invalid OTP'));
-                // Reset button
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<i class="fa-solid fa-check-circle"></i> Verify';
-                }
-                if (spinner) {
-                    spinner.style.display = 'none';
-                }
-            }
-        } catch (error) {
-            console.error('❌ Network error:', error);
-            alert('❌ Network error: ' + error.message);
-            if (submitBtn) {
+                showError(data.message || data.detail || 'Invalid OTP');
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = '<i class="fa-solid fa-check-circle"></i> Verify';
-            }
-            if (spinner) {
                 spinner.style.display = 'none';
             }
+        } catch (error) {
+            showError('❌ Network error: ' + error.message);
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fa-solid fa-check-circle"></i> Verify';
+            spinner.style.display = 'none';
         }
     });
 
@@ -131,10 +113,8 @@
     // ============================================
     document.getElementById('resendBtn').addEventListener('click', async () => {
         const username = localStorage.getItem('username');
-        
         if (!username) {
-            alert('❌ Session expired. Please login again.');
-            window.location.href = '/login.html';
+            showError('❌ Session expired. Please login again.');
             return;
         }
         
@@ -150,20 +130,29 @@
             });
             
             const data = await response.json();
-            
             if (response.ok && data.status === 'success') {
-                alert('✅ New OTP sent to your email!');
+                // Success ke liye bhi showError ka use kar sakte hain ya alert chhor sakte hain
+                showError('✅ New OTP sent to your email!');
             } else {
-                alert('❌ ' + (data.message || 'Failed to resend OTP'));
+                showError('❌ ' + (data.message || 'Failed to resend OTP'));
             }
         } catch (error) {
-            console.error('❌ Resend error:', error);
-            alert('❌ Network error: ' + error.message);
+            showError('❌ Network error: ' + error.message);
         } finally {
             resendBtn.disabled = false;
             resendBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Resend OTP';
         }
     });
+
+    function showError(message) {
+        const errorDiv = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+        if (errorDiv && errorText) {
+            errorDiv.style.display = 'none'; // Reset first
+            errorText.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+    }
 </script>
 </body>
 </html>
