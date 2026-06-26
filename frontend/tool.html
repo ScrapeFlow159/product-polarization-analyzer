@@ -2724,6 +2724,13 @@ function displayResults(page) {
                                 <tbody>${productsHtml || '<tr><td colspan="8">No products found</td></tr>'}</tbody>
                             </table>
                         </div>
+                        <!-- KEY INSIGHTS CARD - Add this after Polarization Score card -->
+<div class="card" id="insightsSection" style="display: none;">
+    <h2><i>💡</i> Key Insights</h2>
+    <div id="insightsContent" style="background: #f0f4ff; padding: 20px; border-radius: 12px; border-left: 5px solid #667eea; line-height: 1.6;">
+        <!-- Dynamic insights will appear here -->
+    </div>
+</div>
                         
                         <div class="charts-grid">
                             <div class="chart-card"><h3><span>🔵</span> Cluster Distribution</h3><div class="chart-container"><canvas id="${page}_scatter_${category}"></canvas></div></div>

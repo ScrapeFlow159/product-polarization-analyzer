@@ -271,6 +271,7 @@ class PolarizationAnalysis(BaseModel):
     csv_file_used: str
     silhouette_score: float
     analysis_type: Optional[str] = "current"
+    insights: Optional[Dict] = None
 
 class TimeComparisonResponse(BaseModel):
     current: Optional[Dict]
@@ -455,7 +456,11 @@ async def analyze_polarization(
                 seller=p.get('seller'),
                 brand=p.get('brand')
             ))
-        
+        results = [{
+            "date": datetime.now().strftime('%Y-%m-%d'),
+            "polarization_score": polarization_score
+        }]
+        insights = generate_insights(results)
         result = PolarizationAnalysis(
             platform=platform_name,
             total_products=len(products),
@@ -468,7 +473,8 @@ async def analyze_polarization(
             data_source=f"CSV - {csv_file}",
             csv_file_used=csv_file,
             silhouette_score=round(sil_score, 4),
-            analysis_type=request.analysis_type
+            analysis_type=request.analysis_type,
+            insights=insights
         )
         
         # ========== SAVE TO DATABASE ==========
@@ -1250,6 +1256,36 @@ def calculate_polarization_score(products, centers, n_clusters):
     
     return round(polarization_score, 3)
 
+def generate_insights(trend_data, analysis_type="current"):
+    """Generate smart business insights"""
+    if not trend_data or len(trend_data) < 2:
+        return {
+            "summary": "Not enough historical data for insights.",
+            "percent_change": 0,
+            "direction": "stable"
+        }
+    
+    scores = [item.get('polarization_score', 0) for item in trend_data]
+    current = scores[-1]
+    previous = scores[-2] if len(scores) > 1 else current
+    
+    change = current - previous
+    percent_change = (change / previous * 100) if previous > 0 else 0
+    
+    direction = "increased" if change > 0 else "decreased"
+    
+    summary = f"Polarization has {direction} by {abs(percent_change):.1f}% in the selected period."
+    
+    if abs(percent_change) > 12:
+        summary += " This is a significant shift in market structure."
+    
+    return {
+        "summary": summary,
+        "current_score": round(current, 3),
+        "percent_change": round(percent_change, 1),
+        "direction": direction,
+        "trend_strength": "Strong" if abs(percent_change) > 10 else "Moderate"
+    }
 def get_polarization_level(score):
     if score < 0.25:
         return "Low Polarization"
