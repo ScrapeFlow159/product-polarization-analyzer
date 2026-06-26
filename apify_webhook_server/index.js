@@ -99,7 +99,7 @@ app.post("/webhook/apify/etsy", async (req, res) => {
         
         console.log("📦 Full Payload:", JSON.stringify(req.body, null, 2)); // ✅ DEBUG
         
-        const { runId, datasetId } = req.body;
+       
         console.log("📦 runId:", runId);
         console.log("📦 datasetId:", datasetId);
 
