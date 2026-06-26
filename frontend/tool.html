@@ -2076,10 +2076,10 @@ async function saveParameters() {
 async function runAnalysis(page) {
     const state = getState(page);
     if (!state || !state.selected || state.selected.length === 0) {
-        alert("Please select at least one category");
+        alert("Please select at least one category!");
         return;
     }
-    
+
     const analyzeBtn = document.getElementById(`${page}AnalyzeBtn`);
     if (analyzeBtn) analyzeBtn.disabled = true;
 
@@ -2090,44 +2090,36 @@ async function runAnalysis(page) {
 
         let analysisType = page === 'weekly' ? 'weekly' : (page === 'monthly' ? 'monthly' : 'current');
         
-        const backendPlatform = state.platform;
+        const backendPlatform = state.platform || "daraz";
         const username = (localStorage.getItem('username') || 'haroon').trim().toLowerCase();
         const role = (localStorage.getItem('role') || 'User').trim();
         const token = localStorage.getItem('token');
 
-        // ===================== SAFE PARAMETER READING =====================
-        let k_value = 3;
-        let weights = { price: 1.0, rating: 1.0, reviews: 1.0, popularity: 1.0 };
-
-        // Read from modal (highest priority)
+        // === FORCE READ LATEST MODAL VALUES ===
         const kEl = document.getElementById('kValue');
-        if (kEl) k_value = parseInt(kEl.value) || 3;
+        let k_value = kEl ? parseInt(kEl.value) || 3 : 3;
 
-        const pEl = document.getElementById('priceWeight');
-        const rEl = document.getElementById('ratingWeight');
-        const reEl = document.getElementById('reviewsWeight');
-        const poEl = document.getElementById('popularityWeight');
+        const weights = {
+            price: parseFloat(document.getElementById('priceWeight')?.value) || 1.0,
+            rating: parseFloat(document.getElementById('ratingWeight')?.value) || 1.0,
+            reviews: parseFloat(document.getElementById('reviewsWeight')?.value) || 1.0,
+            popularity: parseFloat(document.getElementById('popularityWeight')?.value) || 1.0
+        };
 
-        if (pEl) weights.price = parseFloat(pEl.value) || 1.0;
-        if (rEl) weights.rating = parseFloat(rEl.value) || 1.0;
-        if (reEl) weights.reviews = parseFloat(reEl.value) || 1.0;
-        if (poEl) weights.popularity = parseFloat(poEl.value) || 1.0;
+        console.log(`📥 MODAL READ → K=${k_value}`);
 
-        console.log(`📥 Modal Values → K=${k_value}`);
-
-        // If Research Analyst and modal is default, use saved params
-        if (role === 'Research Analyst') {
+        // Only use saved if modal is still default (3)
+        if (role === 'Research Analyst' && k_value === 3) {
             const saved = await fetchSavedParameters();
             if (saved && saved.k_value) {
-                if (k_value === 3) k_value = saved.k_value;
-                if (saved.weights) weights = saved.weights;
-                console.log(`📊 Using Saved Parameters → K=${k_value}`);
+                k_value = saved.k_value;
+                console.log(`🔄 Using Saved DB Value → K=${k_value}`);
             }
         }
 
-        console.log(`🚀 FINAL PARAMETERS → K=${k_value}`, weights);
+        console.log(`🚀 SENDING TO BACKEND → K=${k_value}`, weights);
 
-        // ===================== SEND ANALYSIS =====================
+        // Send analysis
         for (let category of state.selected) {
             const response = await fetch(`${API_BASE_URL}/api/analyze?username=${encodeURIComponent(username)}&role=${encodeURIComponent(role)}`, {
                 method: 'POST',
@@ -2150,20 +2142,14 @@ async function runAnalysis(page) {
             if (response.ok) {
                 const data = await response.json();
                 state.results[category] = data;
-                console.log(`✅ ${category} done with K=${k_value}`);
-            } else {
-                console.error(`Failed for ${category}`);
             }
         }
 
-        // Store for display
-        state.k_value = k_value;
-        setState(page, state);
         displayResults(page);
 
     } catch (error) {
-        console.error('❌ Analysis Error:', error);
-        alert(`Error: ${error.message || 'Unknown error'}`);
+        console.error('❌ Error:', error);
+        alert(`Error: ${error.message}`);
     } finally {
         setLoading(page, false);
         if (analyzeBtn) analyzeBtn.disabled = false;
