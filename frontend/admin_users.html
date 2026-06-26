@@ -398,6 +398,7 @@ async function updateRole(userId) {
 
     const newRole = select.value;
 
+    // Confirm box ko rehne dein, ye user ki safety ke liye zaroori hai
     if (!confirm(`Change this user's role to "${newRole}"?`)) {
         return;
     }
@@ -412,6 +413,7 @@ async function updateRole(userId) {
         const data = await response.json();
 
         if (data.status === 'success') {
+            // Alert hata kar showError use kiya
             showError('✅ User role updated!');
             loadUsers();
         } else {
@@ -439,7 +441,8 @@ async function deleteUser(userId, username) {
         const data = await response.json();
 
         if (data.status === 'success') {
-            showError('✅ User deleted!');
+            // Alert hata kar showError use kiya
+            showError('✅ User deleted successfully!');
             loadUsers();
         } else {
             showError('❌ Failed: ' + data.message);
@@ -449,7 +452,6 @@ async function deleteUser(userId, username) {
         showError('❌ Error deleting user');
     }
 }
-
 // ============================================================
 //  REFRESH
 // ============================================================
