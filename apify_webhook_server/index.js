@@ -91,6 +91,82 @@ app.post("/webhook/apify/daraz", async (req, res) => {
     }
 });
 
+app.post("/webhook/apify/etsy", async (req, res) => {
+    try {
+        console.log("🔥 ETSY WEBHOOK RECEIVED");
+        const { runId, datasetId } = req.body;
+        let category = "unknown";
+
+        // Get category from run details
+        if (runId) {
+            try {
+                const runUrl = `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`;
+                const runResponse = await axios.get(runUrl);
+                const runData = runResponse.data.data;
+                const taskId = runData.actorTaskId;
+                
+                if (taskId) {
+                    const taskUrl = `https://api.apify.com/v2/actor-tasks/${taskId}?token=${APIFY_TOKEN}`;
+                    const taskResponse = await axios.get(taskUrl);
+                    const taskInput = taskResponse.data.data.input;
+                    category = taskInput.category || taskInput.search_keyword || "unknown";
+                } else {
+                    const runInput = runData.input;
+                    category = runInput.category || runInput.search_keyword || "unknown";
+                }
+            } catch (err) {
+                console.log("Could not fetch details:", err.message);
+            }
+        }
+
+        if (!datasetId) {
+            return res.status(200).send("OK - no datasetId");
+        }
+
+        const url = `https://api.apify.com/v2/datasets/${datasetId}/items?clean=true&token=${APIFY_TOKEN}`;
+        const { data: items } = await axios.get(url);
+
+        if (!items || items.length === 0) {
+            console.log("No items found");
+            return res.status(200).send("No items found");
+        }
+
+        console.log(`📦 Etsy: ${items.length} items for ${category}`);
+
+        // ✅ Etsy items — field mapping required
+        const cleanedItems = items.map(item => ({
+            name: item.title || '',
+            itemId: item.listingId || '',
+            price: parseFloat(item.price) || 0,
+            currentPrice: `${item.currency || '$'} ${item.price || '0'}`,
+            brandName: 'Etsy Handmade',
+            sellerName: item.shopName || '',
+            ratingScore: parseFloat(item.rating) || 0,
+            itemSold: parseInt(item.reviewCount) || 0,
+            favorites: parseInt(item.favorites) || 0,
+            location: '',
+            image: item.image || item.imageUrl || '',
+            itemUrl: item.url || '',
+            listedOn: ''
+        }));
+
+        const response = await axios.post(BACKEND_URL, {
+            category: category,
+            products: cleanedItems,
+            count: cleanedItems.length,
+            platform: "etsy"
+        }, { timeout: 60000 });
+
+        console.log(`✅ Etsy forwarded: ${response.status}`);
+        res.status(200).send("OK");
+
+    } catch (error) {
+        console.error("❌ Etsy WEBHOOK ERROR:", error.message);
+        res.status(500).send("Error: " + error.message);
+    }
+});
+
+
 // Debug endpoint
 app.post("/webhook/apify/debug", (req, res) => {
     console.log("🔍 DEBUG - Webhook payload received");
@@ -106,5 +182,6 @@ app.get("/health", (req, res) => {
 app.listen(3000, () => {
     console.log("🚀 Apify Webhook Server running on port 3000");
     console.log("   Webhook URL: /webhook/apify/daraz");
+    console.log("   Etsy Webhook: /webhook/apify/etsy"); 
     console.log("   Forwarding to: " + BACKEND_URL);
 });
