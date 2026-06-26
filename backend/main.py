@@ -727,7 +727,7 @@ research_analyst_params = {}
 
 @app.get("/api/get-params")
 async def get_parameters(username: str = None, role: str = None):
-    """Get current parameters for the user"""
+    """Get current parameters for the user - FIXED"""
     print(f"📊 Get params called: username={username}, role={role}")
     
     default_params = {
@@ -741,20 +741,21 @@ async def get_parameters(username: str = None, role: str = None):
     }
     
     if username and role and role.lower() == "research analyst":
-        # ✅ Try memory first
+        # 1. PEHLE DATABASE CHECK KARO (Taake hamesha fresh data mile)
+        db_params = get_user_params(username)
+        
+        if db_params:
+            print(f"✅ Found in database for {username}")
+            # Memory ko update karo taake agar kahin memory use ho rahi ho toh woh bhi fresh ho
+            research_analyst_params[username] = db_params
+            return db_params
+        
+        # 2. Agar DB mein nahi hai, tabhi memory check karo (Optional fallback)
         if username in research_analyst_params:
             print(f"✅ Found in memory for {username}")
             return research_analyst_params[username]
         
-        # ✅ Try database
-        db_params = get_user_params(username)
-        if db_params:
-            print(f"✅ Found in database for {username}")
-            # Store in memory for future
-            research_analyst_params[username] = db_params
-            return db_params
-        
-        print(f"⚠️ No params found for {username}")
+        print(f"⚠️ No saved params found for {username}")
     
     return default_params
 
@@ -764,19 +765,11 @@ async def set_parameters(
     username: str = None,
     role: str = None
 ):
-    """Set analysis parameters for Research Analyst"""
-    global analysis_params
+    """Set analysis parameters for Research Analyst - FIXED"""
     
     print(f"📊 Set params called: username={username}, role={role}")
     
-    # Update memory
-    analysis_params["k_value"] = params.k_value
-    analysis_params["weights"]["price"] = params.price_weight
-    analysis_params["weights"]["rating"] = params.rating_weight
-    analysis_params["weights"]["reviews"] = params.reviews_weight
-    analysis_params["weights"]["popularity"] = params.popularity_weight
-    
-    # ✅ Save to database
+    # 1. DB mein save karein (Yeh aapka pehle se sahi hai)
     if username and role and role.lower() == "research analyst":
         save_user_params(
             username,
@@ -788,12 +781,24 @@ async def set_parameters(
                 "popularity": params.popularity_weight
             }
         )
+        
+        # 2. MEMORY UPDATE KAREIN (Research Analyst Dictionary mein)
+        # Global analysis_params ke bajaye user-specific memory ko update karein
+        research_analyst_params[username] = {
+            "k_value": params.k_value,
+            "weights": {
+                "price": params.price_weight,
+                "rating": params.rating_weight,
+                "reviews": params.reviews_weight,
+                "popularity": params.popularity_weight
+            }
+        }
     
     return {
         "status": "success",
-        "message": "Parameters updated successfully",
-        "params": analysis_params
+        "message": "Parameters updated successfully"
     }
+
 # Global variables for CSV data
 DARAZ_DATASETS = {}
 ETSY_DATASETS = {}
