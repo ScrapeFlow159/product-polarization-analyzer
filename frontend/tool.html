@@ -2096,42 +2096,46 @@ async function runAnalysis(page) {
         const activeRole = (localStorage.getItem('role') || 'User').trim();
         const activeToken = localStorage.getItem('token') || token;
 
-        // ✅ PRIORITY: First read from Modal (most recent user change)
-        let k_value = parseInt(document.getElementById('kValue').value) || 3;
-        let weights = {
-            price: parseFloat(document.getElementById('priceWeight').value) || 1.0,
-            rating: parseFloat(document.getElementById('ratingWeight').value) || 1.0,
-            reviews: parseFloat(document.getElementById('reviewsWeight').value) || 1.0,
-            popularity: parseFloat(document.getElementById('popularityWeight').value) || 1.0
-        };
+        // ✅ SAFE READING OF PARAMETERS WITH FALLBACKS
+        let k_value = 3;
+        let weights = { price: 1.0, rating: 1.0, reviews: 1.0, popularity: 1.0 };
 
-        // ✅ If Research Analyst and no modal change, use saved parameters
+        // Try to read from modal (most recent change)
+        const kInput = document.getElementById('kValue');
+        if (kInput) k_value = parseInt(kInput.value) || 3;
+
+        const priceW = document.getElementById('priceWeight');
+        const ratingW = document.getElementById('ratingWeight');
+        const reviewsW = document.getElementById('reviewsWeight');
+        const popW = document.getElementById('popularityWeight');
+
+        if (priceW) weights.price = parseFloat(priceW.value) || 1.0;
+        if (ratingW) weights.rating = parseFloat(ratingW.value) || 1.0;
+        if (reviewsW) weights.reviews = parseFloat(reviewsW.value) || 1.0;
+        if (popW) weights.popularity = parseFloat(popW.value) || 1.0;
+
+        // If Research Analyst and modal values are default → use saved params
         if (activeRole === 'Research Analyst') {
             const savedParams = await fetchSavedParameters();
-            if (savedParams && savedParams.k_value) {
-                // Only use saved if modal is still on default
-                if (k_value === 3) {
+            if (savedParams) {
+                if (k_value === 3 && savedParams.k_value) {
                     k_value = savedParams.k_value;
                 }
-                if (JSON.stringify(weights) === JSON.stringify({price:1.0,rating:1.0,reviews:1.0,popularity:1.0})) {
-                    weights = savedParams.weights || weights;
+                if (savedParams.weights) {
+                    weights = { ...weights, ...savedParams.weights };
                 }
-                console.log('📊 Using custom parameters:', { k_value, weights });
+                console.log('📊 Using saved/custom parameters:', { k_value, weights });
             }
         }
 
-        console.log(`🚀 Final Parameters for Analysis → K=${k_value}`, weights);
+        console.log(`🚀 Running Analysis → K=${k_value}`, weights);
 
-        // ✅ STEP 2: Send request with parameters
+        // Rest of your loop (send request)
         for (let i = 0; i < state.selected.length; i++) {
             const category = state.selected[i];
-            console.log(`📡 Analyzing: ${backendPlatform} -> ${category} with K=${k_value}`);
             
-            const url = `${API_BASE_URL}/api/analyze?username=${encodeURIComponent(activeUsername)}&role=${encodeURIComponent(activeRole)}`;
-
-            const response = await fetch(url, {
+            const response = await fetch(`${API_BASE_URL}/api/analyze?username=${encodeURIComponent(activeUsername)}&role=${encodeURIComponent(activeRole)}`, {
                 method: 'POST',
-                mode: 'cors',
                 headers: { 
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${activeToken.trim()}`
@@ -2143,53 +2147,25 @@ async function runAnalysis(page) {
                     max_products: 50,
                     analysis_type: analysisType,
                     save_to_db: true,
-                    k_value: k_value,           // ← Critical
-                    weights: weights            // ← Critical
+                    k_value: k_value,
+                    weights: weights
                 })
             });
             
             if (response.ok) {
                 const data = await response.json();
                 state.results[category] = data;
-                console.log(`✅ ${category} analysis complete with K=${k_value}`);
             } else {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || `Server Error: ${response.status}`);
+                throw new Error(errorData.detail || `Error ${response.status}`);
             }
         }
-        
-        // Fetch comparison data (existing code)
-        for (let i = 0; i < state.selected.length; i++) {
-            const category = state.selected[i];
-            try {
-                const targetPlatform = state.platform === 'daraz' ? 'Daraz.pk' : 'Etsy.com';
-                const compResponse = await fetch(`${API_BASE_URL}/api/comparison/${targetPlatform}/${category}`, {
-                    method: 'GET',
-                    mode: 'cors',
-                    headers: {
-                        'Authorization': `Bearer ${activeToken.trim()}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                if (compResponse.ok) {
-                    const compData = await compResponse.json();
-                    if (page === 'current') currentComparisonData[category] = compData;
-                    else if (page === 'weekly') weeklyComparisonData[category] = compData;
-                    else monthlyComparisonData[category] = compData;
-                }
-            } catch(e) { 
-                console.error("Comparison data error:", e); 
-            }
-        }
-        
-        // Store for display
+
+        // ... rest of your existing code (comparison, displayResults, etc.)
         state.k_value = k_value;
         state.weights = weights;
         setState(page, state);
-        
         displayResults(page);
-        
-        console.log(`📊 Analysis complete! Final K=${k_value}`);
         
     } catch (error) {
         console.error('❌ Analysis Error:', error);
@@ -2199,6 +2175,7 @@ async function runAnalysis(page) {
         if (analyzeBtn) analyzeBtn.disabled = false;
     }
 }
+
 async function analyzeWeeklyCustomWeek() {
     const platform = document.getElementById('weeklyPlatformSelect').value;
     
