@@ -229,23 +229,40 @@ def save_user_params(username, k_value, weights):
     print(f"✅ Saved params to database for {username}: K={k_value}")
 
 def get_user_params(username):
-    """Get user parameters from database"""
-    conn = sqlite3.connect(USERS_DB_PATH)
-    cursor = conn.cursor()
-    
-    cursor.execute(
-        "SELECT k_value, weights FROM user_params WHERE username = ?",
-        (username,)
-    )
-    row = cursor.fetchone()
-    conn.close()
-    
-    if row:
-        return {
-            "k_value": row[0],
-            "weights": json.loads(row[1])
-        }
-    return None
+    """Get user parameters - with guaranteed table creation"""
+    try:
+        conn = sqlite3.connect(USERS_DB_PATH)
+        cursor = conn.cursor()
+        
+        # FORCE CREATE TABLE BEFORE QUERY
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_params (
+                username TEXT PRIMARY KEY,
+                k_value INTEGER NOT NULL,
+                weights TEXT NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        cursor.execute(
+            "SELECT k_value, weights FROM user_params WHERE username = ?",
+            (username,)
+        )
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            print(f"✅ Found in database for {username}: K={row[0]}")
+            return {
+                "k_value": row[0],
+                "weights": json.loads(row[1])
+            }
+        else:
+            print(f"⚠️ No saved params found for {username}")
+            return None
+    except Exception as e:
+        print(f"❌ Error getting params: {e}")
+        return None
 # Data models
 class Product(BaseModel):
     name: str
