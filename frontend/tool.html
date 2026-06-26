@@ -1500,6 +1500,15 @@ function closeModal() {
             
             document.addEventListener('click', () => closeDropdown(page));
         }
+        function openParamsModal() {
+           document.getElementById('paramsModal').style.display = 'block';
+           // Load current values from inputs (in case they were changed)
+           console.log("📌 Parameters modal opened");
+        }
+
+        function closeParamsModal() {
+            document.getElementById('paramsModal').style.display = 'none';
+        }
 
         function getState(page) {
             if (page === 'current') return currentState;
@@ -2024,6 +2033,46 @@ function initCustomAnalysis() {
             });
         }
 
+// ==========================================
+// SAVE PARAMETERS (Research Analyst)
+// ==========================================
+async function saveParameters() {
+    const kValue = parseInt(document.getElementById('kValue').value) || 3;
+    
+    const params = {
+        k_value: kValue,
+        price_weight: parseFloat(document.getElementById('priceWeight').value) || 1.0,
+        rating_weight: parseFloat(document.getElementById('ratingWeight').value) || 1.0,
+        reviews_weight: parseFloat(document.getElementById('reviewsWeight').value) || 1.0,
+        popularity_weight: parseFloat(document.getElementById('popularityWeight').value) || 1.0
+    };
+
+    const username = localStorage.getItem('username');
+    const role = localStorage.getItem('role');
+    const token = localStorage.getItem('token');
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/set-params?username=${username}&role=${role}`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(params)
+        });
+
+        if (response.ok) {
+            alert(`✅ Parameters Saved Successfully! (K=${kValue})`);
+            closeParamsModal();
+        } else {
+            const err = await response.json();
+            alert('❌ Save Failed: ' + (err.detail || err.message));
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Network Error: Could not save parameters');
+    }
+}
 async function runAnalysis(page) {
     
     const state = getState(page);
@@ -2047,23 +2096,31 @@ async function runAnalysis(page) {
         const activeRole = (localStorage.getItem('role') || 'User').trim();
         const activeToken = localStorage.getItem('token') || token;
 
-        // ✅ STEP 1: Fetch parameters ONLY if Research Analyst
-        let k_value = 3;
+        // ✅ PRIORITY: First read from Modal (most recent user change)
+        let k_value = parseInt(document.getElementById('kValue').value) || 3;
         let weights = {
-            price: 1.0,
-            rating: 1.0,
-            reviews: 1.0,
-            popularity: 1.0
+            price: parseFloat(document.getElementById('priceWeight').value) || 1.0,
+            rating: parseFloat(document.getElementById('ratingWeight').value) || 1.0,
+            reviews: parseFloat(document.getElementById('reviewsWeight').value) || 1.0,
+            popularity: parseFloat(document.getElementById('popularityWeight').value) || 1.0
         };
-        
-        const savedParams = await fetchSavedParameters();
-        if (savedParams) {
-            k_value = savedParams.k_value || 3;
-            weights = savedParams.weights || weights;
-            console.log('✅ Using custom parameters:', { k_value, weights });
-        } else {
-            console.log('⚠️ No saved params, using defaults');
+
+        // ✅ If Research Analyst and no modal change, use saved parameters
+        if (activeRole === 'Research Analyst') {
+            const savedParams = await fetchSavedParameters();
+            if (savedParams && savedParams.k_value) {
+                // Only use saved if modal is still on default
+                if (k_value === 3) {
+                    k_value = savedParams.k_value;
+                }
+                if (JSON.stringify(weights) === JSON.stringify({price:1.0,rating:1.0,reviews:1.0,popularity:1.0})) {
+                    weights = savedParams.weights || weights;
+                }
+                console.log('📊 Using custom parameters:', { k_value, weights });
+            }
         }
+
+        console.log(`🚀 Final Parameters for Analysis → K=${k_value}`, weights);
 
         // ✅ STEP 2: Send request with parameters
         for (let i = 0; i < state.selected.length; i++) {
@@ -2086,8 +2143,8 @@ async function runAnalysis(page) {
                     max_products: 50,
                     analysis_type: analysisType,
                     save_to_db: true,
-                    k_value: k_value,
-                    weights: weights
+                    k_value: k_value,           // ← Critical
+                    weights: weights            // ← Critical
                 })
             });
             
@@ -2097,11 +2154,11 @@ async function runAnalysis(page) {
                 console.log(`✅ ${category} analysis complete with K=${k_value}`);
             } else {
                 const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || `Server Validation Error: ${response.status}`);
+                throw new Error(errorData.detail || `Server Error: ${response.status}`);
             }
         }
         
-        // Fetch comparison data
+        // Fetch comparison data (existing code)
         for (let i = 0; i < state.selected.length; i++) {
             const category = state.selected[i];
             try {
@@ -2125,24 +2182,17 @@ async function runAnalysis(page) {
             }
         }
         
-        // ✅ ========== FIX: Store k_value in state ==========
-        state.k_value = k_value;           // ✅ ADD THIS
-        state.weights = weights;           // ✅ ADD THIS
-        
+        // Store for display
+        state.k_value = k_value;
+        state.weights = weights;
         setState(page, state);
+        
         displayResults(page);
         
-        // ✅ Show params used in results
-        if (state.selected.length > 0) {
-            const firstCategory = state.selected[0];
-            const data = state.results[firstCategory];
-            if (data) {
-                console.log(`📊 Analysis complete! K=${k_value}, Score: ${data.polarization_score}`);
-            }
-        }
+        console.log(`📊 Analysis complete! Final K=${k_value}`);
         
     } catch (error) {
-        console.error('❌ Network Pipeline Crash:', error);
+        console.error('❌ Analysis Error:', error);
         alert(`❌ Error: ${error.message}`);
     } finally {
         setLoading(page, false);

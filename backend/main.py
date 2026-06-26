@@ -288,8 +288,8 @@ class AnalysisRequest(BaseModel):
     max_products: Optional[int] = 100
     analysis_type: Optional[str] = "current"  # current, weekly, monthly
     save_to_db: Optional[bool] = True
-    k_value: Optional[int] = 3  # ✅ ADD THIS
-    weights: Optional[Dict[str, float]] = None 
+    k_value: Optional[int] = None          # Changed to None
+    weights: Optional[Dict[str, float]] = None   # Changed to Non
 
 class CustomAnalysisRequest(BaseModel):
     platform: str
@@ -331,35 +331,37 @@ async def analyze_polarization(
         print(f"   User: {username}, Role: {role}")
         print(f"{'='*60}")
         
-        # ========== GET CUSTOM PARAMETERS ==========
-        # ✅ Priority 1: Request body se parameters lein (frontend se aaye hain)
-       # ✅ Direct access - Pydantic model handle kar lega
-        custom_k = request.k_value if request.k_value else 3
-        weights = request.weights if request.weights else {
-        "price": 1.0, "rating": 1.0, "reviews": 1.0, "popularity": 1.0
-}
-        
-        # ✅ Priority 2: Agar request mein nahi hain toh research_analyst_params se lein
+            # ========== GET CUSTOM PARAMETERS ==========
+        # Priority 1: Always prefer values sent from Frontend (modal)
+        custom_k = request.k_value if request.k_value is not None else 3
+        weights = request.weights if request.weights is not None else {
+            "price": 1.0, "rating": 1.0, "reviews": 1.0, "popularity": 1.0
+        }
+
+        print(f"📥 Received from Frontend → k={custom_k}, weights={weights}")
+
+        # Priority 2: Only use saved DB params if frontend didn't send anything meaningful
         if username and role and role.lower() == "research analyst":
-            saved_k = None
-            saved_weights = None
             db_params = get_user_params(username)
             if db_params:
-                saved_k = db_params.get("k_value")
-                saved_weights = db_params.get("weights")
-            print(f"📊 Using database params: K={saved_k}")
-        
-            # Sirf tab override karein jab request mein nahi bheja gaya ho
-            if custom_k == 3 and saved_k:
-                custom_k = saved_k
-                print(f"📊 Using saved K from params: {custom_k}")
-            if weights == {"price": 1.0, "rating": 1.0, "reviews": 1.0, "popularity": 1.0}:
+                print(f"📊 Found saved params in DB: K={db_params.get('k_value')}")
+
+                # Use saved params ONLY if frontend sent default values
+                if custom_k == 3:
+                    custom_k = db_params.get("k_value", 3)
+                    print(f"🔄 Using saved K from DB: {custom_k}")
+
+                if (weights.get("price") == 1.0 and 
+                    weights.get("rating") == 1.0 and 
+                    weights.get("reviews") == 1.0 and 
+                    weights.get("popularity") == 1.0):
+                    
+                    saved_weights = db_params.get("weights")
                     if saved_weights:
                         weights = saved_weights
-                        print(f"📊 Using saved weights from params: {weights}")
+                        print(f"🔄 Using saved weights from DB")
         
-        print(f"📊 FINAL PARAMETERS: k={custom_k}, weights={weights}")
-        
+        print(f"✅ FINAL PARAMETERS USED → k={custom_k}, weights={weights}")
         # ========== PLATFORM SELECTION & DATA EXTRACTION ==========
         if request.platform.lower() == "daraz":
             subcategory = request.subcategory.lower().replace(" ", "_")
