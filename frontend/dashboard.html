@@ -394,11 +394,45 @@ function logout() {
 async function exportCSV() {
     const category = document.getElementById('exportCategory').value;
     const analysisType = document.getElementById('exportType').value;
-    // FIXED: Cleaned root API prefix path mapping
-    const url = `${API_URL}/api/export-results?platform=daraz&category=${category}&analysis_type=${analysisType}&username=${username}&role=${role}`;
-    window.open(url, '_blank');
+    const token = localStorage.getItem('token');
+    const username = localStorage.getItem('username');
+    const role = localStorage.getItem('role');
+    
+    const url = `${API_URL}/api/export-results?platform=daraz&category=${category}&analysis_type=${analysisType}`;
+    
+    try {
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (response.status === 401) {
+            alert('❌ Session expired. Please login again.');
+            window.location.href = '/login.html';
+            return;
+        }
+        
+        if (response.ok) {
+            const blob = await response.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = `${category}_${analysisType}_analysis.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(downloadUrl);
+            alert('✅ CSV downloaded successfully!');
+        } else {
+            const error = await response.json();
+            alert('❌ Failed: ' + (error.detail || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('❌ Export error:', error);
+        alert('❌ Network error: ' + error.message);
+    }
 }
-
 // ===================== PARAMETERS MODAL =====================
 function openParamsModal() {
     document.getElementById('paramsModal').style.display = 'block';
@@ -424,6 +458,10 @@ function closeParamsModal() {
 }
 
 async function saveParameters() {
+    const token = localStorage.getItem('token');
+    const username = localStorage.getItem('username');
+    const role = localStorage.getItem('role');
+    
     const params = {
         k_value: parseInt(document.getElementById('kValue').value),
         price_weight: parseFloat(document.getElementById('priceWeight').value),
@@ -433,30 +471,51 @@ async function saveParameters() {
     };
     
     try {
-        // FIXED: Cleaned root path endpoints
         const response = await fetch(`${API_URL}/api/set-params?username=${username}&role=${role}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify(params)
         });
         
+        if (response.status === 401) {
+            alert('❌ Session expired. Please login again.');
+            window.location.href = '/login.html';
+            return;
+        }
+        
         if (response.ok) {
-            alert('Parameters saved successfully! Run analysis again to see changes.');
+            alert('✅ Parameters saved successfully! Run analysis again to see changes.');
             closeParamsModal();
         } else {
             const error = await response.json();
-            alert('Error: ' + (error.detail || 'Unknown error'));
+            alert('❌ Error: ' + (error.detail || 'Unknown error'));
         }
     } catch(e) {
         console.error('Save error:', e);
-        alert('Error saving parameters: ' + e.message);
+        alert('❌ Error saving parameters: ' + e.message);
     }
 }
-
 async function loadParameters() {
+    const token = localStorage.getItem('token');
+    const username = localStorage.getItem('username');
+    const role = localStorage.getItem('role');
+    
     try {
-        // FIXED: Cleaned root path endpoints
-        const response = await fetch(`${API_URL}/api/get-params?username=${username}&role=${role}`);
+        const response = await fetch(`${API_URL}/api/get-params?username=${username}&role=${role}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (response.status === 401) {
+            alert('❌ Session expired. Please login again.');
+            window.location.href = '/login.html';
+            return;
+        }
+        
         const params = await response.json();
         
         document.getElementById('kValue').value = params.k_value || 3;
@@ -471,6 +530,7 @@ async function loadParameters() {
         document.getElementById('popularityWeightVal').innerText = params.weights?.popularity || 1.0;
     } catch(e) {
         console.error("Error loading parameters:", e);
+        alert('❌ Error loading parameters. Please try again.');
     }
 }
 </script>

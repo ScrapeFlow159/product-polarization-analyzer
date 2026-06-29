@@ -139,7 +139,21 @@ async function loadSettings() {
     document.getElementById('settingsForm').style.display = 'none';
     
     try {
-        const response = await fetch(`${API_BASE}/api/system-settings`);
+        const token = localStorage.getItem('token');
+        
+        // ✅ ADD TOKEN HEADER
+        const response = await fetch(`${API_BASE}/api/system-settings`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.status === 401) {
+            showError('❌ Session expired. Please login again.');
+            setTimeout(() => window.location.href = '/login.html', 2000);
+            return;
+        }
+
         const data = await response.json();
         
         if (data.status === 'success') {
@@ -153,7 +167,7 @@ async function loadSettings() {
             document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
             document.getElementById('settingsForm').style.display = 'block';
         } else {
-            show('Failed to load settings: ' + data.message);
+            showError('Failed to load settings: ' + data.message);
         }
     } catch (error) {
         console.error('Error:', error);
@@ -162,7 +176,6 @@ async function loadSettings() {
         document.getElementById('loadingSpinner').style.display = 'none';
     }
 }
-
 async function saveSettings() {
     const settings = {
         analysis: {
@@ -185,11 +198,24 @@ async function saveSettings() {
     msg.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving settings...';
     
     try {
+        const token = localStorage.getItem('token');
+        
+        // ✅ ADD TOKEN HEADER
         const response = await fetch(`${API_BASE}/api/system-settings`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify(settings)
         });
+
+        if (response.status === 401) {
+            showError('❌ Session expired. Please login again.');
+            setTimeout(() => window.location.href = '/login.html', 2000);
+            return;
+        }
+
         const data = await response.json();
         
         if (data.status === 'success') {
@@ -206,7 +232,6 @@ async function saveSettings() {
         msg.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Network error. Please try again.';
     }
 }
-
 document.addEventListener('DOMContentLoaded', function() {
     if (!localStorage.getItem('token')) {
         window.location.href = '/login.html';

@@ -306,7 +306,21 @@ async function loadUsers() {
     if (empty) empty.style.display = 'none';
 
     try {
-        const response = await fetch(`${API_BASE}/api/manage-users`);
+        const token = localStorage.getItem('token');
+        
+        // ✅ ADD TOKEN HEADER
+        const response = await fetch(`${API_BASE}/api/manage-users`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.status === 401) {
+            showError('❌ Session expired. Please login again.');
+            setTimeout(() => window.location.href = '/login.html', 2000);
+            return;
+        }
+
         const data = await response.json();
 
         console.log('📦 API Response:', data);
@@ -331,7 +345,6 @@ async function loadUsers() {
         if (spinner) spinner.style.display = 'none';
     }
 }
-
 // ============================================================
 //  DISPLAY USERS WITH EDIT & DELETE BUTTONS
 // ============================================================
@@ -398,23 +411,33 @@ async function updateRole(userId) {
 
     const newRole = select.value;
 
-    // Confirm box ko rehne dein, ye user ki safety ke liye zaroori hai
     if (!confirm(`Change this user's role to "${newRole}"?`)) {
         return;
     }
 
     try {
+        const token = localStorage.getItem('token');
+        
+        // ✅ ADD TOKEN HEADER
         const response = await fetch(`${API_BASE}/api/manage-users/${userId}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify({ role: newRole })
         });
 
         const data = await response.json();
 
+        if (response.status === 401) {
+            showError('❌ Session expired. Please login again.');
+            setTimeout(() => window.location.href = '/login.html', 2000);
+            return;
+        }
+
         if (data.status === 'success') {
-            // Alert hata kar showError use kiya
-            showError('✅ User role updated!');
+            showError('✅ User role updated!', 'success');
             loadUsers();
         } else {
             showError('❌ Failed: ' + data.message);
@@ -424,7 +447,6 @@ async function updateRole(userId) {
         showError('❌ Error updating user');
     }
 }
-
 // ============================================================
 //  DELETE USER
 // ============================================================
@@ -434,14 +456,25 @@ async function deleteUser(userId, username) {
     }
 
     try {
+        const token = localStorage.getItem('token');
+        
+        // ✅ ADD TOKEN HEADER
         const response = await fetch(`${API_BASE}/api/manage-users/${userId}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
         });
 
         const data = await response.json();
 
+        if (response.status === 401) {
+            showError('❌ Session expired. Please login again.');
+            setTimeout(() => window.location.href = '/login.html', 2000);
+            return;
+        }
+
         if (data.status === 'success') {
-            // Alert hata kar showError use kiya
             showError('✅ User deleted successfully!');
             loadUsers();
         } else {

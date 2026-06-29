@@ -100,7 +100,21 @@ async function loadLogs() {
     document.getElementById('emptyMessage').style.display = 'none';
     
     try {
-        const response = await fetch(`${API_BASE}/api/view-logs`);
+        const token = localStorage.getItem('token');
+        
+        // ✅ ADD TOKEN HEADER
+        const response = await fetch(`${API_BASE}/api/view-logs`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.status === 401) {
+            showError('❌ Session expired. Please login again.');
+            setTimeout(() => window.location.href = '/login.html', 2000);
+            return;
+        }
+
         const data = await response.json();
         
         if (data.status === 'success') {
@@ -116,7 +130,6 @@ async function loadLogs() {
         document.getElementById('loadingSpinner').style.display = 'none';
     }
 }
-
 function displayLogs(logs) {
     const container = document.getElementById('logsContainer');
     container.innerHTML = '';
