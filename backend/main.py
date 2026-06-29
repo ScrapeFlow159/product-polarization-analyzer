@@ -4,13 +4,16 @@ from fastapi import Response, status
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import pandas as pd
-import json  # ← YEH LINE ADD KARO (pehle se nahi hai)
+import json  
+import jwt
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import numpy as np
 from fastapi.middleware.wsgi import WSGIMiddleware
 from sklearn.metrics import silhouette_score
 from sklearn.cluster import KMeans
 import sqlite3
-from database import DB_PATH  # <-- YEH LINE ADD KARO
+from database import DB_PATH  
 import traceback
 import os
 from datetime import datetime, timedelta
@@ -20,7 +23,7 @@ from database import (
     save_analysis_result, get_current_analysis, get_weekly_analysis,
     get_monthly_analysis, get_polarization_comparison, save_time_snapshot,
     get_trend_data, get_all_historical_data,
-    save_daily_snapshot, get_daily_snapshots, get_weekly_snapshots  # <-- YEH ADD KARO
+    save_daily_snapshot, get_daily_snapshots, get_weekly_snapshots  
 )
 from scheduler import start_scheduler
 from fastapi import HTTPException, Request
@@ -41,6 +44,9 @@ import csv
 from io import StringIO
 from fastapi.responses import StreamingResponse
 
+SECRET_KEY = "secretkey123secretkey123secretkey123"
+ALGORITHM = "HS256"
+
 # main.py mein ye change karein
 app.add_middleware(
     CORSMiddleware,
@@ -58,12 +64,27 @@ import os
 import sqlite3
 from fastapi import Request
 
+# ✅ JWT Verification Function
+def verify_jwt_token(credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer())):
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return {"username": payload.get("sub"), "role": payload.get("role")}
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
 # ✅ USERS_DB_PATH define karein
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 USERS_DB_PATH = os.path.join(BASE_DIR, "users.db")
 
 @app.get("/api/manage-users")
-async def get_users():
+async def get_users(
+    auth_data: dict = Depends(verify_jwt_token)  # ✅ ADD THIS
+):
+    if auth_data["role"] != "Admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
     """Get all users for admin panel"""
     try:
         conn = sqlite3.connect(USERS_DB_PATH)
@@ -86,7 +107,13 @@ async def get_users():
         return {"status": "error", "message": str(e)}
 
 @app.put("/api/manage-users/{user_id}")
-async def update_user(user_id: int, request: Request):
+async def update_user(
+    user_id: int,
+    request: Request,
+    auth_data: dict = Depends(verify_jwt_token)  # ✅ ADD THIS
+):
+    if auth_data["role"] != "Admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
     """Update user role"""
     try:
         data = await request.json()
@@ -113,7 +140,12 @@ async def update_user(user_id: int, request: Request):
         return {"status": "error", "message": str(e)}, 500
 
 @app.delete("/api/manage-users/{user_id}")
-async def delete_user(user_id: int):
+async def delete_user(
+    user_id: int,
+    auth_data: dict = Depends(verify_jwt_token)  # ✅ ADD THIS
+):
+    if auth_data["role"] != "Admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
     """Delete user"""
     try:
         conn = sqlite3.connect(USERS_DB_PATH)
@@ -131,7 +163,11 @@ async def delete_user(user_id: int):
         return {"status": "error", "message": str(e)}, 500
 
 @app.get("/api/system-settings")
-async def get_settings():
+async def get_settings(
+    auth_data: dict = Depends(verify_jwt_token)  # ✅ ADD THIS
+):
+    if auth_data["role"] != "Admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
     """Get system settings"""
     return {
         "status": "success",
@@ -150,7 +186,12 @@ async def get_settings():
     }
 
 @app.put("/api/system-settings")
-async def update_settings(request: Request):
+async def update_settings(
+    request: Request,
+    auth_data: dict = Depends(verify_jwt_token)  # ✅ ADD THIS
+):
+    if auth_data["role"] != "Admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
     """Update system settings"""
     try:
         data = await request.json()
@@ -163,7 +204,11 @@ async def update_settings(request: Request):
         return {"status": "error", "message": str(e)}, 500
 
 @app.get("/api/view-logs")
-async def view_logs():
+async def view_logs(
+    auth_data: dict = Depends(verify_jwt_token)  # ✅ ADD THIS
+):
+    if auth_data["role"] != "Admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
     """View system logs"""
     try:
         logs = []
@@ -337,9 +382,10 @@ class AnalysisParams(BaseModel):
 @app.post("/api/analyze")
 async def analyze_polarization(
     request: AnalysisRequest,
-    username: str = None,
-    role: str = None
+    auth_data: dict = Depends(verify_jwt_token)  
 ):
+    username = auth_data["username"] 
+    role = auth_data["role"] 
     """Main analysis endpoint with time-based analysis support"""
     try:
         print(f"\n{'='*60}")
@@ -348,7 +394,7 @@ async def analyze_polarization(
         print(f"   User: {username}, Role: {role}")
         print(f"{'='*60}")
         
-            # ========== GET CUSTOM PARAMETERS ==========
+        # ========== GET CUSTOM PARAMETERS ==========
         # Priority 1: Always prefer values sent from Frontend (modal)
         custom_k = request.k_value if request.k_value is not None else 3
         weights = request.weights if request.weights is not None else {
@@ -580,9 +626,14 @@ async def export_results(
     platform: str, 
     category: str, 
     analysis_type: str = "current",
-    username: str = None,
-    role: str = None
+    auth_data: dict = Depends(verify_jwt_token)  # ✅ ADD THIS
 ):
+    username = auth_data["username"]
+    role = auth_data["role"]
+    
+    # Check authorization
+    if role not in ["Research Analyst", "Admin"]:
+        raise HTTPException(status_code=403, detail="Only Research Analyst and Admin can export data")
     """Export analysis results as CSV"""
     try:
         print(f"📊 Export requested: platform={platform}, category={category}, type={analysis_type}")
@@ -726,7 +777,14 @@ analysis_params = {
 research_analyst_params = {}
 
 @app.get("/api/get-params")
-async def get_parameters(username: str = None, role: str = None):
+async def get_parameters(
+    auth_data: dict = Depends(verify_jwt_token)  # ✅ ADD THIS
+):
+    username = auth_data["username"]
+    role = auth_data["role"]
+    
+    if role != "Research Analyst":
+        raise HTTPException(status_code=403, detail="Research Analyst access required")
     """Get current parameters for the user - FIXED"""
     print(f"📊 Get params called: username={username}, role={role}")
     
@@ -762,9 +820,13 @@ async def get_parameters(username: str = None, role: str = None):
 @app.post("/api/set-params")
 async def set_parameters(
     params: AnalysisParams,
-    username: str = None,
-    role: str = None
+    auth_data: dict = Depends(verify_jwt_token)  # ✅ ADD THIS
 ):
+    username = auth_data["username"]
+    role = auth_data["role"]
+    
+    if role != "Research Analyst":
+        raise HTTPException(status_code=403, detail="Research Analyst access required")
     """Set analysis parameters for Research Analyst - FIXED"""
     
     print(f"📊 Set params called: username={username}, role={role}")
@@ -1323,9 +1385,10 @@ def get_polarization_level(score):
 @app.post("/api/analyze-custom")
 async def analyze_custom_duration(
     request: CustomAnalysisRequest,
-    username: str = None,
-    role: str = None
+    auth_data: dict = Depends(verify_jwt_token) 
 ):
+    username = auth_data["username"]
+    role = auth_data["role"]
     """
     Custom duration analysis
     request.unit = 'days' ya 'weeks'
