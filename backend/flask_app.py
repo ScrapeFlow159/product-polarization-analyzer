@@ -161,6 +161,44 @@ def api_login():
     if not username or not password:
         return jsonify({"status": "error", "message": "Username and password required"}), 400
     
+    # ✅ Hardcoded Admin Check (Sirf is user ko OTP bypass)
+    HARDCODED_ADMIN = {
+        "username": "admin",
+        "password": "admin123",
+        "email": "arobaarif271@gmail.com",
+        "role": "Admin"
+    }
+    
+    # ✅ Agar hardcoded admin login hai toh OTP bypass karein
+    if username == HARDCODED_ADMIN["username"] and password == HARDCODED_ADMIN["password"]:
+        print(f"🔑 Hardcoded admin login: {username}")
+        
+        # ✅ Generate JWT token directly (no OTP required)
+        jwt_token = create_jwt_token(username, HARDCODED_ADMIN["role"])
+        
+        # ✅ OTP store mein bhi save karein (tracking ke liye)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        otp = str(random.randint(100000, 999999))
+        cursor.execute(
+            "INSERT OR REPLACE INTO otp_store (username, otp, expires_at, role) VALUES (?, ?, ?, ?)",
+            (username, otp, str(datetime.utcnow() + timedelta(minutes=10)), HARDCODED_ADMIN["role"])
+        )
+        conn.commit()
+        conn.close()
+        
+        # ✅ Optional: Email bhi bhejein
+        send_email(HARDCODED_ADMIN["email"], otp)
+        
+        return jsonify({
+            "status": "success",
+            "message": "Admin login successful",
+            "token": jwt_token,
+            "username": username,
+            "role": HARDCODED_ADMIN["role"]
+        }), 200
+    
+    # ✅ Normal user login (with OTP)
     password_hash = hash_password(password)
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -219,7 +257,6 @@ def api_login():
         "status": "success", 
         "message": "OTP sent to your email"
     }), 200
-
 @app.route('/verify_otp', methods=['POST'])
 def api_verify_otp():
     data = request.json or {}
