@@ -155,29 +155,34 @@
 
                 <div class="row mt-3">
                     <div class="col-md-6 mb-3">
-                        <div class="card h-100">
-                            <div class="card-body text-center">
-                                <i class="fas fa-file-csv fa-3x mb-2" style="color: #28a745;"></i>
-                                <h5>Export Results</h5>
-                                <p>Export analysis results as CSV file</p>
-                                <select id="exportCategory" class="form-control mb-2">
-                                    <option value="earpods">Earpods</option>
-                                    <option value="powerbanks">Powerbanks</option>
-                                    <option value="gaming_accessories">Gaming Accessories</option>
-                                    <option value="mobile_phone_accessories">Mobile Phone Accessories</option>
-                                    <option value="smart_watches">Smart Watches</option>
-                                </select>
-                                <select id="exportType" class="form-control mb-2">
-                                    <option value="current">Current Analysis</option>
-                                    <option value="weekly">Weekly Analysis</option>
-                                    <option value="monthly">Monthly Analysis</option>
-                                </select>
-                                <button class="btn-gradient w-100" onclick="exportCSV()">
-                                    <i class="fas fa-download"></i> Export CSV
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+    <div class="card h-100">
+        <div class="card-body text-center">
+            <i class="fas fa-file-csv fa-3x mb-2 text-success"></i>
+            <h5>Export Analysis</h5>
+            
+            <select id="exportPlatform" class="form-control mb-2">
+                <option value="daraz">Daraz.pk (Pakistan)</option>
+                <option value="etsy">Etsy.com (International)</option>
+            </select>
+            
+            <select id="exportCategory" class="form-control mb-2">
+                <!-- Add more categories as needed -->
+                <option value="earpods">Earpods</option>
+                <option value="powerbanks">Powerbanks</option>
+            </select>
+            
+            <select id="exportType" class="form-control mb-3">
+                <option value="current">Current Analysis</option>
+                <option value="weekly">Weekly Analysis</option>
+                <option value="monthly">Monthly Analysis</option>
+            </select>
+            
+            <button class="btn-gradient w-100" onclick="exportCSV()">
+                <i class="fas fa-download"></i> Download CSV Report
+            </button>
+        </div>
+    </div>
+</div>
 
                     <div class="col-md-6 mb-3">
                         <div class="card h-100">
@@ -391,46 +396,35 @@ function logout() {
 }
 
 // ===================== EXPORT CSV =====================
+// ===================== IMPROVED CSV EXPORT =====================
 async function exportCSV() {
+    const platform = document.getElementById('exportPlatform').value;
     const category = document.getElementById('exportCategory').value;
     const analysisType = document.getElementById('exportType').value;
     const token = localStorage.getItem('token');
-    const username = localStorage.getItem('username');
-    const role = localStorage.getItem('role');
-    
-    const url = `${API_URL}/api/export-results?platform=daraz&category=${category}&analysis_type=${analysisType}`;
-    
+
     try {
-        const response = await fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+        const response = await fetch(`${API_URL}/api/export-results?platform=${platform}&category=${category}&analysis_type=${analysisType}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
         });
-        
-        if (response.status === 401) {
-            alert('❌ Session expired. Please login again.');
-            window.location.href = '/login.html';
+
+        if (response.status === 404) {
+            alert(`No ${analysisType} data found for ${platform.toUpperCase()} - ${category}.\n\nPlease run analysis first.`);
             return;
         }
-        
+
         if (response.ok) {
             const blob = await response.blob();
-            const downloadUrl = window.URL.createObjectURL(blob);
+            const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = downloadUrl;
-            a.download = `${category}_${analysisType}_analysis.csv`;
-            document.body.appendChild(a);
+            a.href = url;
+            a.download = `${platform}_${category}_${analysisType}_report.csv`;
             a.click();
-            a.remove();
-            window.URL.revokeObjectURL(downloadUrl);
-            alert('✅ CSV downloaded successfully!');
-        } else {
-            const error = await response.json();
-            alert('❌ Failed: ' + (error.detail || 'Unknown error'));
+            window.URL.revokeObjectURL(url);
+            alert("✅ Report downloaded successfully!");
         }
-    } catch (error) {
-        console.error('❌ Export error:', error);
-        alert('❌ Network error: ' + error.message);
+    } catch(e) {
+        alert("Export failed. Please try again.");
     }
 }
 // ===================== PARAMETERS MODAL =====================

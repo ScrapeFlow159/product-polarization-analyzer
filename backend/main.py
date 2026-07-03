@@ -623,143 +623,73 @@ async def serve_index():
 
 @app.get("/api/export-results")
 async def export_results(
-    platform: str, 
-    category: str, 
-    analysis_type: str = "current",
-    auth_data: dict = Depends(verify_jwt_token)  # ✅ ADD THIS
+    platform: str = "daraz", 
+    category: str = "earpods", 
+    analysis_type: str = "current"
 ):
-    username = auth_data["username"]
-    role = auth_data["role"]
-    
-    # Check authorization
-    if role not in ["Research Analyst", "Admin"]:
-        raise HTTPException(status_code=403, detail="Only Research Analyst and Admin can export data")
-    """Export analysis results as CSV"""
     try:
-        print(f"📊 Export requested: platform={platform}, category={category}, type={analysis_type}")
-        
-        # Check authorization
-        if role not in ["Research Analyst", "Admin"]:
-            raise HTTPException(status_code=403, detail="Only Research Analyst and Admin can export data")
-        
-        import sqlite3
-        from database import DB_PATH
-        import json
-        
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        
-        # Try to get data - first check polarization_analysis
+
+        platform_name = "Daraz.pk" if platform.lower() == "daraz" else "Etsy.com"
+
         cursor.execute('''
-            SELECT * FROM polarization_analysis 
-            WHERE platform LIKE ? AND category = ? 
+            SELECT polarization_score, total_products, clusters, 
+                   feature_importance, top_products, analysis_date
+            FROM polarization_analysis 
+            WHERE platform = ? AND category = ? AND analysis_type = ?
             ORDER BY analysis_date DESC LIMIT 1
-        ''', (f'%{platform}%', category))
-        
+        ''', (platform_name, category, analysis_type))
+
         row = cursor.fetchone()
-        
-        if not row:
-            # Try without platform filter
-            cursor.execute('''
-                SELECT * FROM polarization_analysis 
-                WHERE category = ? 
-                ORDER BY analysis_date DESC LIMIT 1
-            ''', (category,))
-            row = cursor.fetchone()
-        
         conn.close()
-        
+
         if not row:
-            raise HTTPException(status_code=404, detail=f"No data found for {category}. Please run Current Analysis first.")
-        
-        # Parse the data (adjust indices based on your table schema)
-        # polarization_analysis table columns:
-        # 0:id,1:platform,2:category,3:analysis_type,4:analysis_date,5:week_number,6:month_number,7:year,
-        # 8:total_products,9:polarization_score,10:polarization_level,11:silhouette_score,
-        # 12:cluster_data,13:feature_importance,14:top_products
-        
-        data = {
-            'platform': row[1],
-            'category': row[2],
-            'analysis_type': row[3],
-            'analysis_date': row[4],
-            'total_products': row[8],
-            'polarization_score': row[9],
-            'polarization_level': row[10],
-            'silhouette_score': row[11],
-            'clusters': json.loads(row[12]) if row[12] else [],
-            'top_products': json.loads(row[14]) if row[14] else []
-        }
-        
-        print(f"✅ Found data: {data['platform']}/{data['category']} - Score: {data['polarization_score']}")
-        
+            raise HTTPException(
+                status_code=404, 
+                detail=f"No {analysis_type} data found for {platform_name} - {category}. Please run analysis first."
+            )
+
         # Create CSV
         output = StringIO()
         writer = csv.writer(output)
         
-        writer.writerow(['Platform', 'Category', 'Analysis Type', 'Analysis Date', 
-                        'Total Products', 'Polarization Score', 'Polarization Level', 'Silhouette Score'])
-        
-        writer.writerow([
-            data['platform'],
-            data['category'],
-            data['analysis_type'],
-            str(data['analysis_date']),
-            data['total_products'],
-            data['polarization_score'],
-            data['polarization_level'],
-            data['silhouette_score']
-        ])
-        
+        writer.writerow(["Product Polarization Analysis Report"])
+        writer.writerow(["Platform", platform_name])
+        writer.writerow(["Category", category])
+        writer.writerow(["Analysis Type", analysis_type.upper()])
+        writer.writerow(["Generated On", str(row[5])[:19]])
+        writer.writerow(["Polarization Score", round(float(row[0]), 3)])
+        writer.writerow(["Total Products", row[1]])
         writer.writerow([])
-        writer.writerow(['CLUSTER DETAILS'])
-        writer.writerow(['Cluster Label', 'Size', 'Avg Price', 'Avg Rating', 'Percentage'])
+
+        # Clusters
+        writer.writerow(["Cluster Details"])
+        writer.writerow(["Cluster", "Size", "Avg Price", "Avg Rating", "Market Share"])
         
-        for cluster in data['clusters']:
-            writer.writerow([
-                cluster.get('label', ''),
-                cluster.get('size', 0),
-                cluster.get('avg_price', 0),
-                cluster.get('avg_rating', 0),
-                cluster.get('percentage', 0)
-            ])
-        
-        writer.writerow([])
-        writer.writerow(['TOP 10 PRODUCTS'])
-        writer.writerow(['Rank', 'Product Name', 'Price', 'Rating', 'Reviews', 'Popularity', 'Cluster'])
-        
-        for idx, product in enumerate(data['top_products'][:10], 1):
-            writer.writerow([
-                idx,
-                product.get('name', ''),
-                product.get('price', 0),
-                product.get('rating', 0),
-                product.get('reviews', 0),
-                product.get('popularity_score', 0),
-                product.get('cluster_label', '')
-            ])
-        
+        try:
+            clusters = json.loads(row[2]) if row[2] else []
+            for c in clusters:
+                writer.writerow([
+                    c.get('label', 'N/A'),
+                    c.get('size', 0),
+                    c.get('avg_price', 0),
+                    c.get('avg_rating', 0),
+                    f"{c.get('percentage', 0)}%"
+                ])
+        except:
+            pass
+
         output.seek(0)
-        filename = f"{platform}_{category}_{data['analysis_type']}_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         
         return StreamingResponse(
             iter([output.getvalue()]),
             media_type="text/csv",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+            headers={"Content-Disposition": f"attachment; filename={platform}_{category}_{analysis_type}_report.csv"}
         )
-        
-    except HTTPException:
-        raise
+
     except Exception as e:
-        print(f"❌ Export error: {str(e)}")
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
-
-
-
-
-
-
 # Store parameters in session (temporary)
 analysis_params = {
     "k_value": 3,
