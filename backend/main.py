@@ -626,12 +626,11 @@ async def export_results(
     platform: str = "daraz", 
     category: str = "earpods", 
     analysis_type: str = "current",
-    auth_data: dict = Depends(verify_jwt_token)  # ✅ ADD THIS
+    auth_data: dict = Depends(verify_jwt_token)
 ):
     username = auth_data["username"]
     role = auth_data["role"]
     
-    # ✅ Check authorization
     if role not in ["Research Analyst", "Admin"]:
         raise HTTPException(status_code=403, detail="Only Research Analyst and Admin can export data")
     
@@ -641,14 +640,43 @@ async def export_results(
 
         platform_name = "Daraz.pk" if platform.lower() == "daraz" else "Etsy.com"
 
-        cursor.execute('''
-            SELECT polarization_score, total_products, clusters, 
-                   feature_importance, top_products, analysis_date
+        # ✅ First check if table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='polarization_analysis'")
+        if not cursor.fetchone():
+            raise HTTPException(
+                status_code=404, 
+                detail="No analysis data found. Please run analysis first."
+            )
+
+        # ✅ Get columns to query dynamically
+        cursor.execute("PRAGMA table_info(polarization_analysis)")
+        columns = [col[1] for col in cursor.fetchall()]
+        
+        # Build query based on available columns
+        select_fields = ["polarization_score", "total_products", "analysis_date"]
+        if 'clusters' in columns:
+            select_fields.append("clusters")
+        else:
+            select_fields.append("NULL as clusters")
+            
+        if 'feature_importance' in columns:
+            select_fields.append("feature_importance")
+        else:
+            select_fields.append("NULL as feature_importance")
+            
+        if 'top_products' in columns:
+            select_fields.append("top_products")
+        else:
+            select_fields.append("NULL as top_products")
+        
+        query = f'''
+            SELECT {", ".join(select_fields)}
             FROM polarization_analysis 
             WHERE platform = ? AND category = ? AND analysis_type = ?
             ORDER BY analysis_date DESC LIMIT 1
-        ''', (platform_name, category, analysis_type))
-
+        '''
+        
+        cursor.execute(query, (platform_name, category, analysis_type))
         row = cursor.fetchone()
         conn.close()
 
@@ -666,30 +694,35 @@ async def export_results(
         writer.writerow(["Platform", platform_name])
         writer.writerow(["Category", category])
         writer.writerow(["Analysis Type", analysis_type.upper()])
-        writer.writerow(["Generated On", str(row[5])[:19] if row[5] else "N/A"])
+        writer.writerow(["Generated On", str(row[2])[:19] if row[2] else "N/A"])
         writer.writerow(["Polarization Score", round(float(row[0]), 3) if row[0] else "N/A"])
         writer.writerow(["Total Products", row[1] if row[1] else 0])
         writer.writerow([])
 
-        # Clusters
+        # Clusters (if available)
         writer.writerow(["Cluster Details"])
         writer.writerow(["Cluster", "Size", "Avg Price", "Avg Rating", "Market Share"])
         
-        try:
-            clusters = json.loads(row[2]) if row[2] else []
-            if clusters:
-                for c in clusters:
-                    writer.writerow([
-                        c.get('label', 'N/A'),
-                        c.get('size', 0),
-                        c.get('avg_price', 0),
-                        c.get('avg_rating', 0),
-                        f"{c.get('percentage', 0)}%"
-                    ])
-            else:
-                writer.writerow(["No cluster data available"])
-        except:
-            writer.writerow(["Error parsing cluster data"])
+        # ✅ Check if clusters data exists (row[3] is clusters if available)
+        clusters_data = row[3] if len(row) > 3 else None
+        if clusters_data:
+            try:
+                clusters = json.loads(clusters_data)
+                if clusters:
+                    for c in clusters:
+                        writer.writerow([
+                            c.get('label', 'N/A'),
+                            c.get('size', 0),
+                            c.get('avg_price', 0),
+                            c.get('avg_rating', 0),
+                            f"{c.get('percentage', 0)}%"
+                        ])
+                else:
+                    writer.writerow(["No cluster data available"])
+            except:
+                writer.writerow(["Error parsing cluster data"])
+        else:
+            writer.writerow(["No cluster data available"])
 
         output.seek(0)
         
@@ -705,7 +738,6 @@ async def export_results(
         print(f"❌ Export error: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
-
 # Store parameters in session (temporary)
 analysis_params = {
     "k_value": 3,
@@ -1002,6 +1034,10 @@ async def save_apify_csv(products: list, category: str, platform: str):
         print(f"❌ Error saving CSV: {e}")
         traceback.print_exc()
 load_csv_data()
+
+from database import migrate_database
+migrate_database()
+
 
 # Start the background scheduler
 start_scheduler()

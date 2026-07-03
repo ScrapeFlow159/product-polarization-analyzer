@@ -3,6 +3,7 @@ import json
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import os
+import traceback
 import time  # ← YEH LINE ADD KAREIN (time module import karne ke liye)
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "polarization_data.db")
@@ -78,59 +79,97 @@ def init_database():
     conn.close()
     print("✅ Database initialized successfully")
 
-def save_analysis_result(platform: str, category: str, analysis_type: str,
-                         analysis_date: datetime, total_products: int,
-                         polarization_score: float, polarization_level: str,
-                         silhouette_score: float, clusters: List[Dict],
-                         feature_importance: Dict, top_products: List[Dict]):
-    """Save analysis result with retry logic"""
-    
-    week_num = analysis_date.isocalendar()[1]
-    month_num = analysis_date.month
-    year = analysis_date.year
-    
-    # Microsecond hatado taake consistent rahe
-    analysis_date_clean = analysis_date.replace(microsecond=0)
-    
-    max_retries = 5
-    for attempt in range(max_retries):
-        conn = None
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                INSERT OR REPLACE INTO polarization_analysis
-                (platform, category, analysis_type, analysis_date, week_number, month_number, year,
-                 total_products, polarization_score, polarization_level, silhouette_score,
-                 cluster_data, feature_importance, top_products)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                platform, category, analysis_type, analysis_date_clean, week_num, month_num, year,
-                total_products, polarization_score, polarization_level, silhouette_score,
-                json.dumps(clusters), json.dumps(feature_importance), json.dumps(top_products[:10])
-            ))
-            
-            conn.commit()
-            print(f"✅ Saved {analysis_type} analysis for {platform}/{category}")
-            return True
-            
-        except sqlite3.OperationalError as e:
-            if "database is locked" in str(e) and attempt < max_retries - 1:
-                print(f"⚠️ Database locked, retrying... ({attempt + 2}/{max_retries})")
-                time.sleep(1)
-                continue
-            else:
-                print(f"❌ Database error: {e}")
-                raise e
-        except Exception as e:
-            print(f"❌ Error: {e}")
-            raise e
-        finally:
-            if conn:
-                conn.close()
-    
-    return False
+def save_analysis_result(platform, category, analysis_type, analysis_date, 
+                         total_products, polarization_score, polarization_level,
+                         silhouette_score, clusters, feature_importance, top_products):
+    """Save analysis result to database"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Create table with all columns (if not exists)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS polarization_analysis (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                platform TEXT,
+                category TEXT,
+                analysis_type TEXT,
+                analysis_date TIMESTAMP,
+                total_products INTEGER,
+                polarization_score REAL,
+                polarization_level TEXT,
+                silhouette_score REAL,
+                clusters TEXT,
+                feature_importance TEXT,
+                top_products TEXT
+            )
+        """)
+        
+        # Insert data
+        cursor.execute("""
+            INSERT INTO polarization_analysis 
+            (platform, category, analysis_type, analysis_date, total_products, 
+             polarization_score, polarization_level, silhouette_score, 
+             clusters, feature_importance, top_products)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            platform, category, analysis_type, analysis_date,
+            total_products, polarization_score, polarization_level,
+            silhouette_score, 
+            json.dumps(clusters) if clusters else None,
+            json.dumps(feature_importance) if feature_importance else None,
+            json.dumps(top_products) if top_products else None
+        ))
+        
+        conn.commit()
+        conn.close()
+        print(f"✅ Saved {analysis_type} analysis for {platform}/{category}")
+        
+    except Exception as e:
+        print(f"❌ Error saving analysis: {e}")
+        traceback.print_exc()
+def migrate_database():
+    """Add missing columns to polarization_analysis table"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Check if clusters column exists
+        cursor.execute("PRAGMA table_info(polarization_analysis)")
+        columns = [col[1] for col in cursor.fetchall()]
+        
+        # Add clusters column if missing
+        if 'clusters' not in columns:
+            print("🔧 Adding 'clusters' column to polarization_analysis...")
+            cursor.execute("ALTER TABLE polarization_analysis ADD COLUMN clusters TEXT")
+            print("✅ Added clusters column")
+        
+        # Add feature_importance column if missing
+        if 'feature_importance' not in columns:
+            print("🔧 Adding 'feature_importance' column to polarization_analysis...")
+            cursor.execute("ALTER TABLE polarization_analysis ADD COLUMN feature_importance TEXT")
+            print("✅ Added feature_importance column")
+        
+        # Add top_products column if missing
+        if 'top_products' not in columns:
+            print("🔧 Adding 'top_products' column to polarization_analysis...")
+            cursor.execute("ALTER TABLE polarization_analysis ADD COLUMN top_products TEXT")
+            print("✅ Added top_products column")
+        
+        # Add analysis_date column if missing
+        if 'analysis_date' not in columns:
+            print("🔧 Adding 'analysis_date' column to polarization_analysis...")
+            cursor.execute("ALTER TABLE polarization_analysis ADD COLUMN analysis_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+            print("✅ Added analysis_date column")
+        
+        conn.commit()
+        conn.close()
+        print("✅ Database migration completed successfully!")
+        
+    except Exception as e:
+        print(f"❌ Migration error: {e}")
+        traceback.print_exc()
+
 def get_current_analysis(platform: str, category: str) -> Optional[Dict]:
     """Get most recent analysis for current period"""
     conn = sqlite3.connect(DB_PATH)
@@ -221,27 +260,48 @@ def get_monthly_analysis(platform: str, category: str, month_offset: int = 0) ->
     
     return results
 
-def save_time_snapshot(platform: str, category: str, snapshot_type: str,
-                       snapshot_date: datetime, polarization_score: float,
-                       total_products: int, avg_price: float, avg_rating: float,
-                       cluster_distribution: Dict):
-    """Save time-based snapshot for trend analysis"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        INSERT INTO time_snapshots 
-        (platform, category, snapshot_type, snapshot_date, polarization_score,
-         total_products, avg_price, avg_rating, cluster_distribution)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        platform, category, snapshot_type, snapshot_date, polarization_score,
-        total_products, avg_price, avg_rating, json.dumps(cluster_distribution)
-    ))
-    
-    conn.commit()
-    conn.close()
-
+def save_time_snapshot(platform, category, snapshot_type, snapshot_date,
+                       polarization_score, total_products, avg_price, 
+                       avg_rating, cluster_distribution):
+    """Save time snapshot to database"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Create table with all columns
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS time_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                platform TEXT,
+                category TEXT,
+                snapshot_type TEXT,
+                snapshot_date TIMESTAMP,
+                polarization_score REAL,
+                total_products INTEGER,
+                avg_price REAL,
+                avg_rating REAL,
+                cluster_distribution TEXT
+            )
+        """)
+        
+        cursor.execute("""
+            INSERT INTO time_snapshots 
+            (platform, category, snapshot_type, snapshot_date, 
+             polarization_score, total_products, avg_price, avg_rating, cluster_distribution)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            platform, category, snapshot_type, snapshot_date,
+            polarization_score, total_products, avg_price, avg_rating,
+            json.dumps(cluster_distribution) if cluster_distribution else None
+        ))
+        
+        conn.commit()
+        conn.close()
+        print(f"✅ Saved {snapshot_type} snapshot for {platform}/{category}")
+        
+    except Exception as e:
+        print(f"❌ Error saving snapshot: {e}")
+        traceback.print_exc()
 def get_trend_data(platform: str, category: str, period: str, limit: int = 10) -> List[Dict]:
     """Get trend data for visualization"""
     conn = sqlite3.connect(DB_PATH)
