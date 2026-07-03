@@ -157,18 +157,16 @@
                     <div class="col-md-6 mb-3">
     <div class="card h-100">
         <div class="card-body text-center">
-            <i class="fas fa-file-csv fa-3x mb-2 text-success"></i>
-            <h5>Export Analysis</h5>
+            <i class="fas fa-file-csv fa-3x mb-3 text-success"></i>
+            <h5>Export Analysis Results</h5>
             
-            <select id="exportPlatform" class="form-control mb-2">
+            <select id="exportPlatform" class="form-control mb-2" onchange="updateExportCategories()">
                 <option value="daraz">Daraz.pk (Pakistan)</option>
                 <option value="etsy">Etsy.com (International)</option>
             </select>
             
-            <select id="exportCategory" class="form-control mb-2">
-                <!-- Add more categories as needed -->
-                <option value="earpods">Earpods</option>
-                <option value="powerbanks">Powerbanks</option>
+            <select id="exportCategory" class="form-control mb-3">
+                <!-- Will be populated dynamically -->
             </select>
             
             <select id="exportType" class="form-control mb-3">
@@ -177,7 +175,7 @@
                 <option value="monthly">Monthly Analysis</option>
             </select>
             
-            <button class="btn-gradient w-100" onclick="exportCSV()">
+            <button onclick="exportCSV()" class="btn-gradient w-100">
                 <i class="fas fa-download"></i> Download CSV Report
             </button>
         </div>
@@ -527,6 +525,44 @@ async function loadParameters() {
         alert('❌ Error loading parameters. Please try again.');
     }
 }
+// Platform-specific categories
+const categoriesByPlatform = {
+    "daraz": [
+        {value: "earpods", text: "Earpods"},
+        {value: "powerbanks", text: "Powerbanks"},
+        {value: "gaming_accessories", text: "Gaming Accessories"},
+        {value: "mobile_phone_accessories", text: "Mobile Phone Accessories"},
+        {value: "smart_watches", text: "Smart Watches"},
+        {value: "headphones", text: "Headphones"}
+    ],
+    "etsy": [
+        {value: "handmade_earpods", text: "Handmade Earpods"},
+        {value: "wooden_jewelry", text: "Wooden Jewelry"},
+        {value: "vintage_clothing", text: "Vintage Clothing"},
+        {value: "artisan_crafts", text: "Artisan Crafts"},
+        {value: "home_decor", text: "Home Decor"},
+        {value: "personalized_gifts", text: "Personalized Gifts"}
+    ]
+};
+
+function updateExportCategories() {
+    const platform = document.getElementById('exportPlatform').value;
+    const categorySelect = document.getElementById('exportCategory');
+    
+    categorySelect.innerHTML = ''; // Clear previous options
+    
+    categoriesByPlatform[platform].forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat.value;
+        option.textContent = cat.text;
+        categorySelect.appendChild(option);
+    });
+}
+
+// Call on page load
+document.addEventListener('DOMContentLoaded', function() {
+    updateExportCategories();
+});
 </script>
 </body>
 </html>
