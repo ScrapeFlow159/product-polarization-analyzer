@@ -401,28 +401,55 @@ async function exportCSV() {
     const analysisType = document.getElementById('exportType').value;
     const token = localStorage.getItem('token');
 
-    try {
-        const response = await fetch(`${API_URL}/api/export-results?platform=${platform}&category=${category}&analysis_type=${analysisType}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+    if (!token) {
+        alert('❌ Please login first.');
+        window.location.href = '/login.html';
+        return;
+    }
 
+    try {
+        // ✅ Fetch with Authorization header
+        const response = await fetch(
+            `${API_URL}/api/export-results?platform=${platform}&category=${category}&analysis_type=${analysisType}`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            }
+        );
+
+        // ✅ Handle 404 (No data)
         if (response.status === 404) {
-            alert(`No ${analysisType} data found for ${platform.toUpperCase()} - ${category}.\n\nPlease run analysis first.`);
+            alert(`❌ No ${analysisType} data found for ${platform.toUpperCase()} - ${category}.\n\nPlease run analysis first.`);
             return;
         }
 
+        // ✅ Handle 401/403 (Authentication error)
+        if (response.status === 401 || response.status === 403) {
+            alert('❌ Session expired or insufficient permissions. Please login again.');
+            window.location.href = '/login.html';
+            return;
+        }
+
+        // ✅ Handle success
         if (response.ok) {
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = `${platform}_${category}_${analysisType}_report.csv`;
+            document.body.appendChild(a);
             a.click();
+            a.remove();
             window.URL.revokeObjectURL(url);
-            alert("✅ Report downloaded successfully!");
+            alert('✅ Report downloaded successfully!');
+        } else {
+            const error = await response.json();
+            alert(`❌ Export failed: ${error.detail || 'Unknown error'}`);
         }
-    } catch(e) {
-        alert("Export failed. Please try again.");
+    } catch (error) {
+        console.error('Export error:', error);
+        alert('❌ Network error. Please try again.');
     }
 }
 // ===================== PARAMETERS MODAL =====================
