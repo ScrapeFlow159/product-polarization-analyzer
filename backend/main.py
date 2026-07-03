@@ -625,8 +625,16 @@ async def serve_index():
 async def export_results(
     platform: str = "daraz", 
     category: str = "earpods", 
-    analysis_type: str = "current"
+    analysis_type: str = "current",
+    auth_data: dict = Depends(verify_jwt_token)  # ✅ ADD THIS
 ):
+    username = auth_data["username"]
+    role = auth_data["role"]
+    
+    # ✅ Check authorization
+    if role not in ["Research Analyst", "Admin"]:
+        raise HTTPException(status_code=403, detail="Only Research Analyst and Admin can export data")
+    
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -658,9 +666,9 @@ async def export_results(
         writer.writerow(["Platform", platform_name])
         writer.writerow(["Category", category])
         writer.writerow(["Analysis Type", analysis_type.upper()])
-        writer.writerow(["Generated On", str(row[5])[:19]])
-        writer.writerow(["Polarization Score", round(float(row[0]), 3)])
-        writer.writerow(["Total Products", row[1]])
+        writer.writerow(["Generated On", str(row[5])[:19] if row[5] else "N/A"])
+        writer.writerow(["Polarization Score", round(float(row[0]), 3) if row[0] else "N/A"])
+        writer.writerow(["Total Products", row[1] if row[1] else 0])
         writer.writerow([])
 
         # Clusters
@@ -669,16 +677,19 @@ async def export_results(
         
         try:
             clusters = json.loads(row[2]) if row[2] else []
-            for c in clusters:
-                writer.writerow([
-                    c.get('label', 'N/A'),
-                    c.get('size', 0),
-                    c.get('avg_price', 0),
-                    c.get('avg_rating', 0),
-                    f"{c.get('percentage', 0)}%"
-                ])
+            if clusters:
+                for c in clusters:
+                    writer.writerow([
+                        c.get('label', 'N/A'),
+                        c.get('size', 0),
+                        c.get('avg_price', 0),
+                        c.get('avg_rating', 0),
+                        f"{c.get('percentage', 0)}%"
+                    ])
+            else:
+                writer.writerow(["No cluster data available"])
         except:
-            pass
+            writer.writerow(["Error parsing cluster data"])
 
         output.seek(0)
         
@@ -688,8 +699,13 @@ async def export_results(
             headers={"Content-Disposition": f"attachment; filename={platform}_{category}_{analysis_type}_report.csv"}
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"❌ Export error: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+
 # Store parameters in session (temporary)
 analysis_params = {
     "k_value": 3,
