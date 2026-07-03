@@ -38,9 +38,15 @@
                 <option value="Evaluator">Evaluator</option>
             </select>
         </div>
+
+        <div id="successMessage" class="alert alert-success mt-3" style="display: none;">
+    <i class="fas fa-check-circle"></i> <span id="successText"></span>
+</div>
         <div id="errorMessage" class="alert alert-danger mt-3" style="display: none;">
     <i class="fas fa-exclamation-triangle"></i> <span id="errorText"></span>
 </div>
+
+
         <button type="submit" class="btn btn-primary w-100">
             <i class="fa-solid fa-user-check"></i> Create Account
         </button>
@@ -75,12 +81,22 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
         const data = await response.json();
         
         if (response.ok || data.status === 'success') {
-            // Success hone par aap alert rakh sakti hain ya seedha redirect
-            window.location.href = '/login.html';
-        } else {
-            // ALERTS HATA DIYE GAYE HAIN
-            showError(data.message || 'Registration failed');
-        }
+    // ✅ Show success alert
+    const successDiv = document.getElementById('successMessage');
+    const successText = document.getElementById('successText');
+    if (successDiv && successText) {
+        successText.textContent = `✅ Registration successful! Welcome ${formData.username}! Redirecting to login...`;
+        successDiv.style.display = 'block';
+    }
+    
+    // Redirect after 2 seconds
+    setTimeout(() => {
+        window.location.href = '/login.html?registered=true';
+    }, 2000);
+    
+} else {
+    showError(data.message || 'Registration failed');
+}
     } catch (error) {
         // ALERTS HATA DIYE GAYE HAIN
         showError('❌ Connection failed. Check your backend.');

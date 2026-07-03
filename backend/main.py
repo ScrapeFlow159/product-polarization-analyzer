@@ -690,20 +690,28 @@ async def export_results(
         output = StringIO()
         writer = csv.writer(output)
         
-        writer.writerow(["Product Polarization Analysis Report"])
-        writer.writerow(["Platform", platform_name])
-        writer.writerow(["Category", category])
-        writer.writerow(["Analysis Type", analysis_type.upper()])
-        writer.writerow(["Generated On", str(row[2])[:19] if row[2] else "N/A"])
-        writer.writerow(["Polarization Score", round(float(row[0]), 3) if row[0] else "N/A"])
-        writer.writerow(["Total Products", row[1] if row[1] else 0])
+        # ========== HEADER SECTION ==========
+        writer.writerow(["=" * 60])
+        writer.writerow(["PRODUCT POLARIZATION ANALYSIS REPORT"])
+        writer.writerow(["=" * 60])
         writer.writerow([])
-
-        # Clusters (if available)
-        writer.writerow(["Cluster Details"])
+        
+        # ========== BASIC INFO ==========
+        writer.writerow(["Platform:", platform_name])
+        writer.writerow(["Category:", category])
+        writer.writerow(["Analysis Type:", analysis_type.upper()])
+        writer.writerow(["Generated On:", str(row[2])[:19] if row[2] else "N/A"])
+        writer.writerow(["Polarization Score:", round(float(row[0]), 3) if row[0] else "N/A"])
+        writer.writerow(["Polarization Level:", get_polarization_level(float(row[0])) if row[0] else "N/A"])
+        writer.writerow(["Total Products Analyzed:", row[1] if row[1] else 0])
+        writer.writerow([])
+        
+        # ========== CLUSTER DETAILS ==========
+        writer.writerow(["-" * 60])
+        writer.writerow(["CLUSTER DISTRIBUTION"])
+        writer.writerow(["-" * 60])
         writer.writerow(["Cluster", "Size", "Avg Price", "Avg Rating", "Market Share"])
         
-        # ✅ Check if clusters data exists (row[3] is clusters if available)
         clusters_data = row[3] if len(row) > 3 else None
         if clusters_data:
             try:
@@ -713,7 +721,7 @@ async def export_results(
                         writer.writerow([
                             c.get('label', 'N/A'),
                             c.get('size', 0),
-                            c.get('avg_price', 0),
+                            f"${c.get('avg_price', 0):.2f}" if platform.lower() == "etsy" else f"Rs. {c.get('avg_price', 0):.2f}",
                             c.get('avg_rating', 0),
                             f"{c.get('percentage', 0)}%"
                         ])
@@ -723,6 +731,73 @@ async def export_results(
                 writer.writerow(["Error parsing cluster data"])
         else:
             writer.writerow(["No cluster data available"])
+        
+        writer.writerow([])
+        
+        # ========== TOP 10 PRODUCTS ==========
+        writer.writerow(["-" * 60])
+        writer.writerow(["🏆 TOP 10 PRODUCTS RANKING"])
+        writer.writerow(["-" * 60])
+        writer.writerow(["Rank", "Product Name", "Price", "Rating", "Reviews", "Cluster", "Score"])
+        
+        top_products_data = row[5] if len(row) > 5 else None  # top_products is at index 5
+        if top_products_data:
+            try:
+                products = json.loads(top_products_data)
+                if products:
+                    for idx, p in enumerate(products[:10], 1):
+                        # Calculate ranking score if not available
+                        score = p.get('ranking_score', 0)
+                        if score == 0:
+                            # Calculate simple score
+                            rating_norm = p.get('rating', 0) / 5.0
+                            reviews_norm = min(1.0, p.get('reviews', 0) / 1000)
+                            price_norm = min(1.0, p.get('price', 0) / 1000)
+                            score = round((rating_norm * 0.4 + reviews_norm * 0.3 + (1 - price_norm) * 0.3) * 100, 1)
+                        
+                        price_str = f"${p.get('price', 0):.2f}" if platform.lower() == "etsy" else f"Rs. {p.get('price', 0):.2f}"
+                        writer.writerow([
+                            idx,
+                            p.get('name', 'N/A')[:50],
+                            price_str,
+                            p.get('rating', 0),
+                            p.get('reviews', 0),
+                            p.get('cluster_label', 'N/A'),
+                            f"{score:.1f}%"
+                        ])
+                else:
+                    writer.writerow(["No product data available"])
+            except Exception as e:
+                writer.writerow([f"Error parsing product data: {str(e)}"])
+        else:
+            writer.writerow(["No product data available"])
+        
+        writer.writerow([])
+        
+        # ========== FEATURE IMPORTANCE ==========
+        writer.writerow(["-" * 60])
+        writer.writerow(["FEATURE IMPORTANCE"])
+        writer.writerow(["-" * 60])
+        
+        feature_data = row[4] if len(row) > 4 else None  # feature_importance is at index 4
+        if feature_data:
+            try:
+                features = json.loads(feature_data)
+                if features:
+                    writer.writerow(["Feature", "Importance (%)"])
+                    for key, value in features.items():
+                        writer.writerow([key.capitalize(), f"{value:.1f}%"])
+                else:
+                    writer.writerow(["No feature importance data available"])
+            except:
+                writer.writerow(["Error parsing feature importance data"])
+        else:
+            writer.writerow(["No feature importance data available"])
+        
+        writer.writerow([])
+        writer.writerow(["=" * 60])
+        writer.writerow(["END OF REPORT"])
+        writer.writerow(["=" * 60])
 
         output.seek(0)
         

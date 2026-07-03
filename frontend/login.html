@@ -25,7 +25,9 @@
             <label><i class="fa-solid fa-lock"></i> Password</label>
             <input type="password" name="password" class="form-control" >
         </div>
-
+        <div id="successMessage" class="alert alert-success mt-3" style="display: none;">
+    <i class="fas fa-check-circle"></i> <span id="successText"></span>
+</div>
         <!-- INLINE ERROR -->
         <div id="errorMessage" class="alert alert-danger mt-3" style="display: none;">
             <i class="fas fa-exclamation-triangle"></i> <span id="errorText"></span>
@@ -70,16 +72,42 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
         const data = await response.json();
         
         if (response.ok || data.status === 'success') {
-            localStorage.setItem('username', formData.username);
-            window.location.href = '/otp.html';
-        } else {
-            showError(data.message || data.detail || 'Login failed');
-        }
+    // ✅ Show success alert
+    const successDiv = document.getElementById('successMessage');
+    const successText = document.getElementById('successText');
+    if (successDiv && successText) {
+        successText.textContent = `✅ Welcome ${formData.username}! Login successful! Redirecting to OTP...`;
+        successDiv.style.display = 'block';
+    }
+    
+    localStorage.setItem('username', formData.username);
+    
+    // Redirect after 2 seconds
+    setTimeout(() => {
+        window.location.href = '/otp.html';
+    }, 2000);
+    
+} else {
+    showError(data.message || data.detail || 'Login failed');
+}
     } catch (error) {
         showError('Network error. Please check your internet connection.');
     }
 });
 
+// ✅ Check if user came from registration
+window.onload = function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const registered = urlParams.get('registered');
+    if (registered === 'true') {
+        const successDiv = document.getElementById('successMessage');
+        const successText = document.getElementById('successText');
+        if (successDiv && successText) {
+            successText.textContent = '✅ Registration successful! Please login to continue.';
+            successDiv.style.display = 'block';
+        }
+    }
+};
 function showError(message) {
     const errorDiv = document.getElementById('errorMessage');
     const errorText = document.getElementById('errorText');
