@@ -413,24 +413,31 @@ async def analyze_polarization(
         print(f"   User: {username}, Role: {role}")
         print(f"{'='*60}")
         
+        # ========== GET SYSTEM DEFAULTS (Admin Settings) ==========
+        from database import get_system_settings
+        system_settings = get_system_settings()
+        system_default_k = system_settings.get("analysis", {}).get("default_k_value", 3)
+        print(f"📊 System Default K-Value: {system_default_k}")
+        
         # ========== GET CUSTOM PARAMETERS ==========
-        # Priority 1: Always prefer values sent from Frontend (modal)
-        custom_k = request.k_value if request.k_value is not None else 3
+        # Priority 1: Frontend values (user ne manually select kiya)
+        custom_k = request.k_value if request.k_value is not None else system_default_k
         weights = request.weights if request.weights is not None else {
             "price": 1.0, "rating": 1.0, "reviews": 1.0, "popularity": 1.0
         }
 
-        print(f"📥 Received from Frontend → k={custom_k}, weights={weights}")
+        print(f"📥 Received from Frontend → k={request.k_value}, weights={request.weights}")
+        print(f"✅ FINAL VALUES → k={custom_k}, weights={weights}")
 
-        # Priority 2: Only use saved DB params if frontend didn't send anything meaningful
+        # ========== RESEARCH ANALYST SAVED PARAMS ==========
         if username and role and role.lower() == "research analyst":
             db_params = get_user_params(username)
             if db_params:
                 print(f"📊 Found saved params in DB: K={db_params.get('k_value')}")
-
-                # Use saved params ONLY if frontend sent default values
-                if custom_k == 3:
-                    custom_k = db_params.get("k_value", 3)
+                
+                # Use saved params ONLY if frontend sent default
+                if custom_k == system_default_k:
+                    custom_k = db_params.get("k_value", system_default_k)
                     print(f"🔄 Using saved K from DB: {custom_k}")
 
                 if (weights.get("price") == 1.0 and 
@@ -444,6 +451,8 @@ async def analyze_polarization(
                         print(f"🔄 Using saved weights from DB")
         
         print(f"✅ FINAL PARAMETERS USED → k={custom_k}, weights={weights}")
+        
+        
         # ========== PLATFORM SELECTION & DATA EXTRACTION ==========
         if request.platform.lower() == "daraz":
             subcategory = request.subcategory.lower().replace(" ", "_")
