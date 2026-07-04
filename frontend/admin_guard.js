@@ -10,8 +10,8 @@
             document.body.innerHTML = `
                 <div style="text-align:center; padding-top:100px; font-family:sans-serif;">
                     <h1 style="color:red;">❌ Unauthorized Access</h1>
-                    <p>Aapke paas Admin panel ko access karne ki ijazat nahi hai.</p>
-                    <a href="/dashboard.html" style="font-size:18px;">Dashboard par wapas jayein</a>
+                    <p>You dont have access to Admin panel.</p>
+                    <a href="/dashboard.html" style="font-size:18px;">Redirect to dashboard</a>
                 </div>
             `;
             // Message dikha do

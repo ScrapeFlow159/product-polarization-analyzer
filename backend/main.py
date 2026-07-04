@@ -23,7 +23,8 @@ from database import (
     save_analysis_result, get_current_analysis, get_weekly_analysis,
     get_monthly_analysis, get_polarization_comparison, save_time_snapshot,
     get_trend_data, get_all_historical_data,
-    save_daily_snapshot, get_daily_snapshots, get_weekly_snapshots  
+    save_daily_snapshot, get_daily_snapshots, get_weekly_snapshots ,
+     get_system_settings, save_system_settings 
 )
 from scheduler import start_scheduler
 from fastapi import HTTPException, Request
@@ -164,45 +165,63 @@ async def delete_user(
 
 @app.get("/api/system-settings")
 async def get_settings(
-    auth_data: dict = Depends(verify_jwt_token)  # ✅ ADD THIS
+    auth_data: dict = Depends(verify_jwt_token)
 ):
     if auth_data["role"] != "Admin":
         raise HTTPException(status_code=403, detail="Admin access required")
-    """Get system settings"""
-    return {
-        "status": "success",
-        "settings": {
-            "analysis": {
-                "default_k_value": 3,
-                "max_products": 100,
-                "weekly_analysis_enabled": True,
-                "monthly_analysis_enabled": True
-            },
-            "email": {
-                "sender": "arobaarif271@gmail.com",
-                "otp_expiry_minutes": 10
-            }
+    """Get system settings from database"""
+    try:
+        from database import get_system_settings
+        settings = get_system_settings()
+        return {
+            "status": "success",
+            "settings": settings
         }
-    }
+    except Exception as e:
+        print(f"❌ Error getting settings: {e}")
+        traceback.print_exc()
+        return {
+            "status": "error",
+            "message": str(e)
+        }, 500
+
 
 @app.put("/api/system-settings")
 async def update_settings(
     request: Request,
-    auth_data: dict = Depends(verify_jwt_token)  # ✅ ADD THIS
+    auth_data: dict = Depends(verify_jwt_token)
 ):
     if auth_data["role"] != "Admin":
         raise HTTPException(status_code=403, detail="Admin access required")
-    """Update system settings"""
+    """Save system settings to database"""
     try:
+        from database import save_system_settings
+        
         data = await request.json()
-        return {
-            "status": "success",
-            "message": "Settings updated",
-            "settings": data
-        }
+        settings = data.get("settings", data)  # Handle both formats
+        
+        # Save to database
+        success = save_system_settings(settings)
+        
+        if success:
+            return {
+                "status": "success",
+                "message": "Settings saved successfully!",
+                "settings": settings
+            }
+        else:
+            return {
+                "status": "error",
+                "message": "Failed to save settings"
+            }, 500
+            
     except Exception as e:
-        return {"status": "error", "message": str(e)}, 500
-
+        print(f"❌ Error saving settings: {e}")
+        traceback.print_exc()
+        return {
+            "status": "error",
+            "message": str(e)
+        }, 500
 @app.get("/api/view-logs")
 async def view_logs(
     auth_data: dict = Depends(verify_jwt_token)  # ✅ ADD THIS

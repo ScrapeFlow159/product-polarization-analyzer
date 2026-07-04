@@ -58,6 +58,14 @@ def init_database():
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS system_settings (
+            id INTEGER PRIMARY KEY,
+            config_key TEXT UNIQUE,
+            config_value TEXT
+        )
+    """)
     
     # Table for trend analysis
     cursor.execute('''
@@ -514,6 +522,172 @@ def get_weekly_snapshots(platform, category, num_weeks):
         {'date': row[0], 'polarization_score': row[1], 'total_products': row[2]}
         for row in rows
     ]
+
+
+# ============================================================
+# SYSTEM SETTINGS FUNCTIONS
+# ============================================================
+
+def get_system_settings():
+    """Get system settings from database"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Create table if not exists
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS system_settings (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                config_key TEXT UNIQUE,
+                config_value TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Get all settings
+        cursor.execute("SELECT config_key, config_value FROM system_settings")
+        rows = cursor.fetchall()
+        conn.close()
+        
+        # Default settings
+        settings = {
+            "analysis": {
+                "default_k_value": 3,
+                "max_products": 100,
+                "weekly_analysis_enabled": True,
+                "monthly_analysis_enabled": True
+            },
+            "email": {
+                "sender": "admin@polarization.com",
+                "otp_expiry_minutes": 10
+            }
+        }
+        
+        # Override with database values
+        for key, value in rows:
+            if key.startswith("analysis."):
+                setting_key = key.replace("analysis.", "")
+                if setting_key in settings["analysis"]:
+                    # Convert to appropriate type
+                    if isinstance(settings["analysis"][setting_key], bool):
+                        settings["analysis"][setting_key] = value.lower() == "true"
+                    elif isinstance(settings["analysis"][setting_key], int):
+                        settings["analysis"][setting_key] = int(value)
+                    else:
+                        settings["analysis"][setting_key] = value
+            elif key.startswith("email."):
+                setting_key = key.replace("email.", "")
+                if setting_key in settings["email"]:
+                    if isinstance(settings["email"][setting_key], int):
+                        settings["email"][setting_key] = int(value)
+                    else:
+                        settings["email"][setting_key] = value
+        
+        return settings
+        
+    except Exception as e:
+        print(f"❌ Error getting settings: {e}")
+        traceback.print_exc()
+        # Return defaults on error
+        return {
+            "analysis": {
+                "default_k_value": 3,
+                "max_products": 100,
+                "weekly_analysis_enabled": True,
+                "monthly_analysis_enabled": True
+            },
+            "email": {
+                "sender": "admin@polarization.com",
+                "otp_expiry_minutes": 10
+            }
+        }
+
+
+def save_system_settings(settings):
+    """Save system settings to database"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Create table if not exists
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS system_settings (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                config_key TEXT UNIQUE,
+                config_value TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Flatten settings dictionary
+        flat_settings = {}
+        
+        # Analysis settings
+        if "analysis" in settings:
+            for key, value in settings["analysis"].items():
+                flat_settings[f"analysis.{key}"] = str(value)
+        
+        # Email settings
+        if "email" in settings:
+            for key, value in settings["email"].items():
+                flat_settings[f"email.{key}"] = str(value)
+        
+        # Insert or update each setting
+        for key, value in flat_settings.items():
+            cursor.execute("""
+                INSERT INTO system_settings (config_key, config_value)
+                VALUES (?, ?)
+                ON CONFLICT(config_key) DO UPDATE SET 
+                    config_value = excluded.config_value,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (key, value))
+        
+        conn.commit()
+        conn.close()
+        print(f"✅ System settings saved: {len(flat_settings)} settings")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error saving settings: {e}")
+        traceback.print_exc()
+        return False
+
+
+def get_setting(key, default=None):
+    """Get a single setting value"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT config_value FROM system_settings WHERE config_key = ?", (key,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            return row[0]
+        return default
+    except Exception as e:
+        print(f"❌ Error getting setting {key}: {e}")
+        return default
+
+
+def save_setting(key, value):
+    """Save a single setting value"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO system_settings (config_key, config_value)
+            VALUES (?, ?)
+            ON CONFLICT(config_key) DO UPDATE SET 
+                config_value = excluded.config_value,
+                updated_at = CURRENT_TIMESTAMP
+        """, (key, str(value)))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error saving setting {key}: {e}")
+        return False
 
 # Initialize database on module load
 init_database()
