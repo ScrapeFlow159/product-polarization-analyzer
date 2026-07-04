@@ -1,32 +1,25 @@
-// admin_guard.js
 (function() {
-    // Page ko turant hide kar dein taake unauthorized user ko kuch na dikhe
+    // 1. Page ko hide rakho taake content na dikhe
     document.documentElement.style.visibility = 'hidden';
 
-    // Window load hone par check karein (taki localStorage access sahi ho)
     window.addEventListener('DOMContentLoaded', () => {
-        const token = localStorage.getItem('token');
         const role = localStorage.getItem('role');
 
-        if (!token) {
-            window.location.href = '/login.html';
-            return;
-        }
-
         if (role !== 'Admin') {
-            // Alert ki jagah direct unauthorized access message
+            // Agar Admin nahi hai, toh content ko replace kardo Error Message se
             document.body.innerHTML = `
-                <div style="display:flex; justify-content:center; align-items:center; height:100vh; flex-direction:column; font-family:sans-serif;">
-                    <h1 style="color:#dc3545;"><i class="fas fa-lock"></i> 403 - Access Denied</h1>
-                    <p>Aapke paas is page ko dekhne ki ijazat nahi hai.</p>
-                    <a href="/dashboard.html" class="btn btn-primary">Dashboard par wapas jayein</a>
+                <div style="text-align:center; padding-top:100px; font-family:sans-serif;">
+                    <h1 style="color:red;">❌ Unauthorized Access</h1>
+                    <p>Aapke paas Admin panel ko access karne ki ijazat nahi hai.</p>
+                    <a href="/dashboard.html" style="font-size:18px;">Dashboard par wapas jayein</a>
                 </div>
             `;
+            // Message dikha do
             document.documentElement.style.visibility = 'visible';
             return;
         }
 
-        // Agar Admin hai, toh content visible kar dein
+        // Agar Admin hai, toh visibility normal kar do
         document.documentElement.style.visibility = 'visible';
     });
 })();
