@@ -534,13 +534,12 @@ def get_system_settings():
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         
-        # Create table if not exists
+        # Create table if not exists (without updated_at)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS system_settings (
                 id INTEGER PRIMARY KEY CHECK (id = 1),
                 config_key TEXT UNIQUE,
-                config_value TEXT,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                config_value TEXT
             )
         """)
         
@@ -568,7 +567,6 @@ def get_system_settings():
             if key.startswith("analysis."):
                 setting_key = key.replace("analysis.", "")
                 if setting_key in settings["analysis"]:
-                    # Convert to appropriate type
                     if isinstance(settings["analysis"][setting_key], bool):
                         settings["analysis"][setting_key] = value.lower() == "true"
                     elif isinstance(settings["analysis"][setting_key], int):
@@ -588,7 +586,6 @@ def get_system_settings():
     except Exception as e:
         print(f"❌ Error getting settings: {e}")
         traceback.print_exc()
-        # Return defaults on error
         return {
             "analysis": {
                 "default_k_value": 3,
@@ -601,21 +598,18 @@ def get_system_settings():
                 "otp_expiry_minutes": 10
             }
         }
-
-
 def save_system_settings(settings):
     """Save system settings to database"""
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         
-        # Create table if not exists
+        # Create table if not exists (without updated_at)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS system_settings (
                 id INTEGER PRIMARY KEY CHECK (id = 1),
                 config_key TEXT UNIQUE,
-                config_value TEXT,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                config_value TEXT
             )
         """)
         
@@ -632,14 +626,13 @@ def save_system_settings(settings):
             for key, value in settings["email"].items():
                 flat_settings[f"email.{key}"] = str(value)
         
-        # Insert or update each setting
+        # Insert or update each setting (without updated_at)
         for key, value in flat_settings.items():
             cursor.execute("""
                 INSERT INTO system_settings (config_key, config_value)
                 VALUES (?, ?)
                 ON CONFLICT(config_key) DO UPDATE SET 
-                    config_value = excluded.config_value,
-                    updated_at = CURRENT_TIMESTAMP
+                    config_value = excluded.config_value
             """, (key, value))
         
         conn.commit()
@@ -651,8 +644,6 @@ def save_system_settings(settings):
         print(f"❌ Error saving settings: {e}")
         traceback.print_exc()
         return False
-
-
 def get_setting(key, default=None):
     """Get a single setting value"""
     try:

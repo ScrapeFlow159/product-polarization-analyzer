@@ -24,7 +24,7 @@ from database import (
     get_monthly_analysis, get_polarization_comparison, save_time_snapshot,
     get_trend_data, get_all_historical_data,
     save_daily_snapshot, get_daily_snapshots, get_weekly_snapshots ,
-     get_system_settings, save_system_settings 
+    get_system_settings, save_system_settings 
 )
 from scheduler import start_scheduler
 from fastapi import HTTPException, Request
