@@ -952,6 +952,9 @@
 // ==========================================
 const API_BASE_URL = 'https://product-polarization-analyzer-production.up.railway.app';
 
+
+
+
 const urlParams = new URLSearchParams(window.location.search);
 const token = urlParams.get('token') || localStorage.getItem('token') || localStorage.getItem('jwt_token');
 
@@ -989,6 +992,31 @@ if (!token || token === "null" || token === "undefined") {
 // ==========================================
 // ANALYZE WITH ROLE-BASED PARAMETERS
 // ==========================================
+
+// ==========================================
+// GET SYSTEM DEFAULT K FROM ADMIN SETTINGS
+// ==========================================
+async function getSystemDefaultK() {
+    try {
+        const token = localStorage.getItem('token');
+        if (!token) return 3;
+        
+        const response = await fetch(`${API_BASE_URL}/api/system-settings`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            const kValue = data.settings?.analysis?.default_k_value || 3;
+            console.log(`📊 Admin System Default K: ${kValue}`);
+            return kValue;
+        }
+        return 3;
+    } catch (error) {
+        console.error('❌ Error loading system K:', error);
+        return 3;
+    }
+}
 async function analyzeCurrentPolarization(selectedCategories, platform) {
     if (!selectedCategories || selectedCategories.length === 0) {
         alert("Please select at least one category.");
@@ -1007,26 +1035,30 @@ async function analyzeCurrentPolarization(selectedCategories, platform) {
         const token = localStorage.getItem('token');
         
         // ✅ STEP 1: Fetch parameters ONLY if Research Analyst
-        let k_value = 3;
-        let weights = {
-            price: 1.0,
-            rating: 1.0,
-            reviews: 1.0,
-            popularity: 1.0
-        };
-        
-        if (role && role.toLowerCase() === 'research analyst') {
-            const savedParams = await fetchSavedParameters();
-            if (savedParams) {
-                k_value = savedParams.k_value || 3;
-                weights = savedParams.weights || weights;
-                console.log('🔬 Research Analyst - Using custom parameters:', { k_value, weights });
-            } else {
-                console.log('🔬 Research Analyst - Using default parameters (no saved config)');
-            }
-        } else {
-            console.log(`👤 ${role} - Using default parameters`);
-        }
+        // ✅ STEP 1: Get system default from Admin Settings
+let k_value = await getSystemDefaultK();
+let weights = {
+    price: 1.0,
+    rating: 1.0,
+    reviews: 1.0,
+    popularity: 1.0
+};
+
+console.log(`📊 System Default K from Admin: ${k_value}`);
+
+// ✅ STEP 2: Override ONLY if Research Analyst has saved params
+if (role && role.toLowerCase() === 'research analyst') {
+    const savedParams = await fetchSavedParameters();
+    if (savedParams && savedParams.k_value) {
+        k_value = savedParams.k_value;
+        weights = savedParams.weights || weights;
+        console.log('🔬 Research Analyst - Using custom parameters:', { k_value, weights });
+    } else {
+        console.log('🔬 Research Analyst - No saved params, using system default');
+    }
+} else {
+    console.log(`👤 ${role} - Using system default K=${k_value}`);
+}
 
         // Platform mapping
         let backendPlatform = platform.toUpperCase();
