@@ -80,6 +80,10 @@ def verify_jwt_token(credentials: HTTPAuthorizationCredentials = Depends(HTTPBea
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 USERS_DB_PATH = os.path.join(BASE_DIR, "users.db")
 
+@app.get("/")
+def root():
+    return {"message": "API running 🚀"}
+
 @app.get("/api/manage-users")
 async def get_users(
     auth_data: dict = Depends(verify_jwt_token)  # ✅ ADD THIS
