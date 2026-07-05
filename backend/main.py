@@ -1063,17 +1063,46 @@ def load_csv_data():
 async def apify_webhook(request: dict, background_tasks: BackgroundTasks):
     """
     Apify webhook handler - receives data from webhook service and saves CSV
+    Supports both Daraz and Etsy formats
     """
     try:
         print("\n" + "="*60)
         print("🔥 WEBHOOK RECEIVED FROM APIFY")
         print("="*60)
         
-        # ✅ Get data from webhook
+        # ✅ Check if it's Etsy (template variables)
+        dataset_id = request.get("datasetId")
+        if dataset_id and dataset_id.startswith("{{"):
+            # Etsy webhook with template variables - extract from resource
+            resource = request.get("resource", {})
+            dataset_id = resource.get("defaultDatasetId")
+            category = request.get("category", "etsy")
+            if category.startswith("{{"):
+                category = "etsy"
+            platform = "etsy"
+            
+            print(f"📦 Etsy webhook detected")
+            print(f"📦 datasetId: {dataset_id}")
+            print(f"📂 Category: {category}")
+            
+            if dataset_id and not dataset_id.startswith("{{"):
+                background_tasks.add_task(fetch_apify_products, dataset_id, category, platform)
+                return {
+                    "status": "success",
+                    "message": f"Processing Etsy dataset {dataset_id} for {category}",
+                    "category": category,
+                    "platform": platform
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": "No valid datasetId found"
+                }, 400
+        
+        # ✅ Daraz format - direct products
         category = request.get("category", "unknown")
         products = request.get("products", [])
         platform = request.get("platform", "daraz")
-        count = request.get("count", 0)
         
         print(f"📂 Category: {category}")
         print(f"📦 Products received: {len(products)}")
@@ -1097,8 +1126,7 @@ async def apify_webhook(request: dict, background_tasks: BackgroundTasks):
             
             # Try to get products from dataset
             dataset_id = request.get("datasetId") or request.get("dataset_id")
-            if dataset_id:
-                # Fetch from Apify API
+            if dataset_id and not dataset_id.startswith("{{"):
                 import requests
                 APIFY_TOKEN = os.getenv("APIFY_TOKEN", "apify_api_HlY6edMSwNJqptH4B2FWttNUIIbHKV0z1JTy")
                 url = f"https://api.apify.com/v2/datasets/{dataset_id}/items?clean=true&token={APIFY_TOKEN}"
@@ -1124,6 +1152,28 @@ async def apify_webhook(request: dict, background_tasks: BackgroundTasks):
         return {"status": "error", "message": str(e)}, 500
 
 
+async def fetch_apify_products(dataset_id: str, category: str, platform: str):
+    """Fetch products from Apify dataset"""
+    try:
+        import requests
+        APIFY_TOKEN = os.getenv("APIFY_TOKEN", "apify_api_HlY6edMSwNJqptH4B2FWttNUIIbHKV0z1JTy")
+        
+        print(f"📥 Fetching products from dataset: {dataset_id}")
+        
+        url = f"https://api.apify.com/v2/datasets/{dataset_id}/items?clean=true&token={APIFY_TOKEN}"
+        response = requests.get(url)
+        
+        if response.status_code == 200:
+            products = response.json()
+            print(f"✅ Fetched {len(products)} products")
+            await save_apify_csv(products, category, platform)
+        else:
+            print(f"❌ Failed to fetch: {response.status_code}")
+            
+    except Exception as e:
+        print(f"❌ Error fetching products: {e}")
+        traceback.print_exc()
+        
 async def save_apify_csv(products: list, category: str, platform: str):
     """
     Save Apify products to CSV and reload in memory
