@@ -1892,7 +1892,7 @@ async def collect_weekly_data(background_tasks: BackgroundTasks):
     return {"message": "Weekly data collection started in background"}
 
 if __name__ == "__main__":
-    import uvicorn
+   
     print("\n" + "="*60)
     print("🌐 API STARTING - TIME-BASED ANALYSIS MODE")
     print("="*60)
@@ -1904,6 +1904,4 @@ if __name__ == "__main__":
     print("   - Automatic weekly data collection")
     print("\n🚀 Server running at: http://localhost:8000")
     print("="*60)
-    
-port = int(os.environ.get("PORT", 8080)) 
-uvicorn.run(app, host="0.0.0.0", port=port)
+ 
