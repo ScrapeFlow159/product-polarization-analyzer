@@ -51,10 +51,14 @@ ALGORITHM = "HS256"
 # main.py mein ye change karein
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://product-polarization-analyzer.vercel.app"],
+    allow_origins=[
+        "https://product-polarization-analyzer.vercel.app",
+        "https://polarizationanalyzer.com",
+        "https://www.polarizationanalyzer.com"
+    ],
     allow_credentials=True,
-    allow_methods=["*"], # Sab methods allow karein
-    allow_headers=["*"], # Sab headers allow karein
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 print("Flask app mounted successfully on /auth")
