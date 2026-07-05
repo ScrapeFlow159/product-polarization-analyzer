@@ -1034,31 +1034,49 @@ async function analyzeCurrentPolarization(selectedCategories, platform) {
         const role = localStorage.getItem('role') || 'User';
         const token = localStorage.getItem('token');
         
-        // ✅ STEP 1: Fetch parameters ONLY if Research Analyst
         // ✅ STEP 1: Get system default from Admin Settings
-let k_value = await getSystemDefaultK();
-let weights = {
-    price: 1.0,
-    rating: 1.0,
-    reviews: 1.0,
-    popularity: 1.0
-};
+        const systemK = await getSystemDefaultK();
+        console.log(`📊 System Default K from Admin: ${systemK}`);
 
-console.log(`📊 System Default K from Admin: ${k_value}`);
+        // ✅ STEP 2: Check if user manually changed the input
+        const kEl = document.getElementById('kValue');
+        let userK = kEl ? parseInt(kEl.value) || null : null;
 
-// ✅ STEP 2: Override ONLY if Research Analyst has saved params
-if (role && role.toLowerCase() === 'research analyst') {
-    const savedParams = await fetchSavedParameters();
-    if (savedParams && savedParams.k_value) {
-        k_value = savedParams.k_value;
-        weights = savedParams.weights || weights;
-        console.log('🔬 Research Analyst - Using custom parameters:', { k_value, weights });
-    } else {
-        console.log('🔬 Research Analyst - No saved params, using system default');
-    }
-} else {
-    console.log(`👤 ${role} - Using system default K=${k_value}`);
-}
+        let k_value;
+        let weights = {
+            price: parseFloat(document.getElementById('priceWeight')?.value) || 1.0,
+            rating: parseFloat(document.getElementById('ratingWeight')?.value) || 1.0,
+            reviews: parseFloat(document.getElementById('reviewsWeight')?.value) || 1.0,
+            popularity: parseFloat(document.getElementById('popularityWeight')?.value) || 1.0
+        };
+
+        // ✅ Priority 1: User manual selection (if they changed it from default)
+        if (userK !== null && userK !== systemK) {
+            k_value = userK;
+            console.log(`👤 User manually selected K=${k_value}`);
+        }
+        // ✅ Priority 2: Research Analyst saved params
+        else if (role && role.toLowerCase() === 'research analyst') {
+            const savedParams = await fetchSavedParameters();
+            if (savedParams && savedParams.k_value) {
+                k_value = savedParams.k_value;
+                weights = savedParams.weights || weights;
+                console.log('🔬 Research Analyst - Using custom parameters:', { k_value, weights });
+            } else {
+                k_value = systemK;
+                console.log('🔬 Research Analyst - No saved params, using system default');
+            }
+        }
+        // ✅ Priority 3: System default
+        else {
+            k_value = systemK;
+            console.log(`👤 ${role} - Using system default K=${k_value}`);
+        }
+
+        // ✅ Update input field
+        if (kEl) {
+            kEl.value = k_value;
+        }
 
         // Platform mapping
         let backendPlatform = platform.toUpperCase();
@@ -1108,7 +1126,7 @@ if (role && role.toLowerCase() === 'research analyst') {
         if (data && data.polarization_score) {
             const paramsInfo = role === 'Research Analyst' 
                 ? `🔬 Research Analyst: K=${k_value}`
-                : `👤 ${role}: Default parameters (K=3)`;
+                : `👤 ${role}: Using system default K=${k_value}`;
             
             console.log('📊 Analysis Result:', data);
             console.log('📋 Params Used:', paramsInfo);
@@ -1126,8 +1144,7 @@ if (role && role.toLowerCase() === 'research analyst') {
     } finally {
         if (loadingContainer) loadingContainer.style.display = 'none';
     }
-}
-// Helper functions matching layout step statuses
+}// Helper functions matching layout step statuses
 function updateStep(page, stepNum, status) {
     const stepEl = document.getElementById(`${page}Step${stepNum}`);
     if (stepEl) {
@@ -2229,17 +2246,26 @@ async function analyzeWeeklyCustomWeek() {
     const token = localStorage.getItem('token');
     
     // ✅ ADD: Fetch saved parameters for Research Analyst
-    let k_value = 3;
-    let weights = { price: 1.0, rating: 1.0, reviews: 1.0, popularity: 1.0 };
-    
-    if (role && role.toLowerCase() === 'research analyst') {
-        const savedParams = await fetchSavedParameters();
-        if (savedParams) {
-            k_value = savedParams.k_value || 3;
-            weights = savedParams.weights || weights;
-            console.log('🔬 Research Analyst - Custom K:', k_value);
-        }
+    // ✅ Get system default from Admin Settings
+const systemK = await getSystemDefaultK();
+let k_value = systemK;
+let weights = { price: 1.0, rating: 1.0, reviews: 1.0, popularity: 1.0 };
+
+console.log(`📊 System Default K from Admin: ${systemK}`);
+
+// ✅ Override ONLY if Research Analyst has saved params
+if (role && role.toLowerCase() === 'research analyst') {
+    const savedParams = await fetchSavedParameters();
+    if (savedParams && savedParams.k_value) {
+        k_value = savedParams.k_value;
+        weights = savedParams.weights || weights;
+        console.log('🔬 Research Analyst - Using custom parameters:', { k_value, weights });
+    } else {
+        console.log('🔬 Research Analyst - No saved params, using system default');
     }
+} else {
+    console.log(`👤 ${role} - Using system default K=${k_value}`);
+}
     
     // Show tabs container
     const tabsContainer = document.getElementById('weeklyCustomTabs');
@@ -2505,17 +2531,26 @@ async function analyzeMonthlyCustomMonth() {
     const token = localStorage.getItem('token');
     
     // ✅ ADD: Fetch saved parameters for Research Analyst
-    let k_value = 3;
-    let weights = { price: 1.0, rating: 1.0, reviews: 1.0, popularity: 1.0 };
-    
-    if (role && role.toLowerCase() === 'research analyst') {
-        const savedParams = await fetchSavedParameters();
-        if (savedParams) {
-            k_value = savedParams.k_value || 3;
-            weights = savedParams.weights || weights;
-            console.log('🔬 Research Analyst - Custom K:', k_value);
-        }
+    // ✅ Get system default from Admin Settings
+const systemK = await getSystemDefaultK();
+let k_value = systemK;
+let weights = { price: 1.0, rating: 1.0, reviews: 1.0, popularity: 1.0 };
+
+console.log(`📊 System Default K from Admin: ${systemK}`);
+
+// ✅ Override ONLY if Research Analyst has saved params
+if (role && role.toLowerCase() === 'research analyst') {
+    const savedParams = await fetchSavedParameters();
+    if (savedParams && savedParams.k_value) {
+        k_value = savedParams.k_value;
+        weights = savedParams.weights || weights;
+        console.log('🔬 Research Analyst - Using custom parameters:', { k_value, weights });
+    } else {
+        console.log('🔬 Research Analyst - No saved params, using system default');
     }
+} else {
+    console.log(`👤 ${role} - Using system default K=${k_value}`);
+}
     
     // Show tabs container
     const tabsContainer = document.getElementById('monthlyCustomTabs');
