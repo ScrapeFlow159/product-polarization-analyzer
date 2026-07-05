@@ -79,6 +79,12 @@ def hash_password(password):
 
 def send_email(to_email, otp):
     """Send OTP via Brevo API"""
+    from database import get_system_settings
+    
+    # ✅ Get OTP expiry from admin settings
+    settings = get_system_settings()
+    otp_expiry_minutes = settings.get("email", {}).get("otp_expiry_minutes", 10)
+    
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {
         "api-key": os.getenv("BREVO_API_KEY"),
@@ -88,7 +94,7 @@ def send_email(to_email, otp):
         "sender": {"email": SENDER_EMAIL},
         "to": [{"email": to_email}],
         "subject": "Your OTP for Login",
-        "htmlContent": f"<p>Your OTP is: <strong>{otp}</strong></p><p>This OTP will expire in 10 minutes.</p>"
+        "htmlContent": f"<p>Your OTP is: <strong>{otp}</strong></p><p>This OTP will expire in {otp_expiry_minutes} minutes.</p>"
     }
     try:
         response = requests.post(url, json=data, headers=headers)
@@ -101,7 +107,6 @@ def send_email(to_email, otp):
     except Exception as e:
         print(f"❌ Email error: {e}")
         return False
-
 def create_jwt_token(username, role):
     payload = {
         "sub": username,
@@ -180,12 +185,20 @@ def api_login():
         conn = get_db_connection()
         cursor = conn.cursor()
         otp = str(random.randint(100000, 999999))
+        # ✅ Get OTP expiry from admin settings
+        from database import get_system_settings
+        settings = get_system_settings()
+        otp_expiry_minutes = settings.get("email", {}).get("otp_expiry_minutes", 10)
+
+# ✅ Store OTP in database with dynamic expiry
         cursor.execute(
             "INSERT OR REPLACE INTO otp_store (username, otp, expires_at, role) VALUES (?, ?, ?, ?)",
-            (username, otp, str(datetime.utcnow() + timedelta(minutes=10)), HARDCODED_ADMIN["role"])
+            (username, otp, str(datetime.utcnow() + timedelta(minutes=otp_expiry_minutes)), HARDCODED_ADMIN["role"])
         )
         conn.commit()
         conn.close()
+
+        
         
         # ✅ Optional: Email bhi bhejein
         send_email(HARDCODED_ADMIN["email"], otp)
@@ -244,9 +257,15 @@ def api_login():
     # ✅ Store OTP in database
     conn = get_db_connection()
     cursor = conn.cursor()
+    # ✅ Get OTP expiry from admin settings
+    from database import get_system_settings
+    settings = get_system_settings()
+    otp_expiry_minutes = settings.get("email", {}).get("otp_expiry_minutes", 10)
+
+# ✅ Store OTP in database with dynamic expiry
     cursor.execute(
         "INSERT OR REPLACE INTO otp_store (username, otp, expires_at, role) VALUES (?, ?, ?, ?)",
-        (username, otp, str(datetime.utcnow() + timedelta(minutes=10)), role)
+        (username, otp, str(datetime.utcnow() + timedelta(minutes=otp_expiry_minutes)), role)
     )
     conn.commit()
     conn.close()
@@ -364,9 +383,15 @@ def api_resend_otp():
     # ✅ Store new OTP
     conn = get_db_connection()
     cursor = conn.cursor()
+    # ✅ Get OTP expiry from admin settings
+    from database import get_system_settings
+    settings = get_system_settings()
+    otp_expiry_minutes = settings.get("email", {}).get("otp_expiry_minutes", 10)
+
+# ✅ Store OTP in database with dynamic expiry
     cursor.execute(
-        "INSERT INTO otp_store (username, otp, expires_at, role) VALUES (?, ?, ?, ?)",
-        (username, otp, str(datetime.utcnow() + timedelta(minutes=10)), role)
+    "INSERT OR REPLACE INTO otp_store (username, otp, expires_at, role) VALUES (?, ?, ?, ?)",
+    (username, otp, str(datetime.utcnow() + timedelta(minutes=otp_expiry_minutes)), role)
     )
     conn.commit()
     conn.close()

@@ -1069,23 +1069,65 @@ async def apify_webhook(request: dict, background_tasks: BackgroundTasks):
         print("\n" + "="*60)
         print("🔥 WEBHOOK RECEIVED FROM APIFY")
         print("="*60)
+        print(f"📦 Full Payload: {json.dumps(request, indent=2)}")
         
-        # ✅ Check if it's Etsy (template variables)
+        # ✅ Get datasetId
         dataset_id = request.get("datasetId")
-        if dataset_id and dataset_id.startswith("{{"):
-            # Etsy webhook with template variables - extract from resource
-            resource = request.get("resource", {})
-            dataset_id = resource.get("defaultDatasetId")
-            category = request.get("category", "etsy")
-            if category.startswith("{{"):
+        
+        # ✅ Check if it's Etsy (has datasetId)
+        if dataset_id:
+            # ✅ Clean datasetId if it's a template variable
+            if isinstance(dataset_id, str) and dataset_id.startswith("{{"):
+                resource = request.get("resource", {})
+                dataset_id = resource.get("defaultDatasetId")
+            
+            # ✅ Get category from multiple sources
+            category = request.get("category")
+            
+            # ✅ If category is None or starts with {{, try to get from input
+            if not category or (isinstance(category, str) and category.startswith("{{")):
+                # Try to get from input
+                input_data = request.get("input", {})
+                if isinstance(input_data, dict):
+                    # ✅ Check if "search" array exists and has first item
+                    search = input_data.get("search", [])
+                    if search and len(search) > 0:
+                        category = search[0]  # "vintage" -> category = "vintage"
+                    # Check for category field directly
+                    elif input_data.get("category"):
+                        category = input_data.get("category")
+                
+                # Try ALL_INPUT
+                if not category:
+                    all_input = request.get("ALL_INPUT", {})
+                    if isinstance(all_input, dict):
+                        search = all_input.get("search", [])
+                        if search and len(search) > 0:
+                            category = search[0]
+                        elif all_input.get("category"):
+                            category = all_input.get("category")
+                
+                # Try resource
+                if not category:
+                    resource = request.get("resource", {})
+                    if isinstance(resource, dict):
+                        input_data = resource.get("input", {})
+                        if isinstance(input_data, dict):
+                            search = input_data.get("search", [])
+                            if search and len(search) > 0:
+                                category = search[0]
+            
+            # ✅ If still None, use "etsy" as fallback
+            if not category:
                 category = "etsy"
+            
             platform = "etsy"
             
             print(f"📦 Etsy webhook detected")
             print(f"📦 datasetId: {dataset_id}")
             print(f"📂 Category: {category}")
             
-            if dataset_id and not dataset_id.startswith("{{"):
+            if dataset_id and not (isinstance(dataset_id, str) and dataset_id.startswith("{{")):
                 background_tasks.add_task(fetch_apify_products, dataset_id, category, platform)
                 return {
                     "status": "success",
@@ -1126,7 +1168,7 @@ async def apify_webhook(request: dict, background_tasks: BackgroundTasks):
             
             # Try to get products from dataset
             dataset_id = request.get("datasetId") or request.get("dataset_id")
-            if dataset_id and not dataset_id.startswith("{{"):
+            if dataset_id and not (isinstance(dataset_id, str) and dataset_id.startswith("{{")):
                 import requests
                 APIFY_TOKEN = os.getenv("APIFY_TOKEN", "apify_api_HlY6edMSwNJqptH4B2FWttNUIIbHKV0z1JTy")
                 url = f"https://api.apify.com/v2/datasets/{dataset_id}/items?clean=true&token={APIFY_TOKEN}"
@@ -1150,7 +1192,6 @@ async def apify_webhook(request: dict, background_tasks: BackgroundTasks):
         print(f"❌ Webhook error: {e}")
         traceback.print_exc()
         return {"status": "error", "message": str(e)}, 500
-
 
 async def fetch_apify_products(dataset_id: str, category: str, platform: str):
     """Fetch products from Apify dataset"""
