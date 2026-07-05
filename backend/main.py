@@ -398,18 +398,15 @@ class AnalysisParams(BaseModel):
 
 
 def get_k_value_from_db():
-    conn = sqlite3.connect('my_database.db')
+    conn = sqlite3.connect(DB_PATH)  # ✅ SAHI DB
     cursor = conn.cursor()
-    # Database se wahi table uthao jo humne pichle step mein banayi thi
-    cursor.execute("SELECT config_value FROM system_settings WHERE id = 1")
+    cursor.execute("SELECT config_value FROM system_settings WHERE config_key = 'analysis.default_k_value'")
     row = cursor.fetchone()
     conn.close()
     
     if row:
-        # JSON string ko wapas object mein badalna
-        settings = json.loads(row[0])
-        return settings['analysis']['default_k_value']
-    return 3  # Agar database mein kuch na mile toh default 3 lelo
+        return int(row[0])
+    return 3
 @app.post("/api/analyze")
 async def analyze_polarization(
     request: AnalysisRequest,
@@ -634,6 +631,25 @@ async def analyze_polarization(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/public-system-settings")
+async def get_public_settings():
+    """
+    Public endpoint for getting system settings - NO AUTH REQUIRED
+    Sirf default_k_value return karega, sensitive data nahi
+    """
+    try:
+        from database import get_system_settings
+        settings = get_system_settings()
+        return {
+            "status": "success",
+            "default_k_value": settings.get("analysis", {}).get("default_k_value", 3)
+        }
+    except Exception as e:
+        print(f"❌ Error getting public settings: {e}")
+        return {
+            "status": "error",
+            "default_k_value": 3
+        }
 @app.get("/test")
 def test():
     return {"message": "working"}

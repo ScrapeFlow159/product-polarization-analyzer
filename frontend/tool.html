@@ -998,16 +998,12 @@ if (!token || token === "null" || token === "undefined") {
 // ==========================================
 async function getSystemDefaultK() {
     try {
-        const token = localStorage.getItem('token');
-        if (!token) return 3;
-        
-        const response = await fetch(`${API_BASE_URL}/api/system-settings`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        // ✅ Public endpoint - NO TOKEN REQUIRED
+        const response = await fetch(`${API_BASE_URL}/api/public-system-settings`);
         
         if (response.ok) {
             const data = await response.json();
-            const kValue = data.settings?.analysis?.default_k_value || 3;
+            const kValue = data.default_k_value || 3;
             console.log(`📊 Admin System Default K: ${kValue}`);
             return kValue;
         }
@@ -1017,22 +1013,17 @@ async function getSystemDefaultK() {
         return 3;
     }
 }
-
 // ==========================================
 // SET DEFAULT K FROM ADMIN SETTINGS
 // ==========================================
 async function setDefaultKValue() {
     try {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-        
-        const response = await fetch(`${API_BASE_URL}/api/system-settings`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        // ✅ Public endpoint - NO TOKEN REQUIRED
+        const response = await fetch(`${API_BASE_URL}/api/public-system-settings`);
         
         if (response.ok) {
             const data = await response.json();
-            const kValue = data.settings?.analysis?.default_k_value || 3;
+            const kValue = data.default_k_value || 3;
             const kEl = document.getElementById('kValue');
             if (kEl) {
                 kEl.value = kValue;
