@@ -1017,6 +1017,32 @@ async function getSystemDefaultK() {
         return 3;
     }
 }
+
+// ==========================================
+// SET DEFAULT K FROM ADMIN SETTINGS
+// ==========================================
+async function setDefaultKValue() {
+    try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        
+        const response = await fetch(`${API_BASE_URL}/api/system-settings`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            const kValue = data.settings?.analysis?.default_k_value || 3;
+            const kEl = document.getElementById('kValue');
+            if (kEl) {
+                kEl.value = kValue;
+                console.log(`✅ K-Value set to: ${kValue} (Admin Settings)`);
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error loading K:', error);
+    }
+}
 async function analyzeCurrentPolarization(selectedCategories, platform) {
     if (!selectedCategories || selectedCategories.length === 0) {
         alert("Please select at least one category.");
@@ -1508,7 +1534,10 @@ function closeModal() {
     checkBackend();
     setupEventListeners();
     initCustomAnalysis();
-    // ✅ Force initialize current page categories
+    
+    // ✅ SET DEFAULT K FROM ADMIN SETTINGS
+    setDefaultKValue();
+    
     const platformSelect = document.getElementById('currentPlatformSelect');
     if (platformSelect && platformSelect.value) {
         handlePlatformChange('current');

@@ -397,7 +397,19 @@ class AnalysisParams(BaseModel):
 
 
 
-
+def get_k_value_from_db():
+    conn = sqlite3.connect('my_database.db')
+    cursor = conn.cursor()
+    # Database se wahi table uthao jo humne pichle step mein banayi thi
+    cursor.execute("SELECT config_value FROM system_settings WHERE id = 1")
+    row = cursor.fetchone()
+    conn.close()
+    
+    if row:
+        # JSON string ko wapas object mein badalna
+        settings = json.loads(row[0])
+        return settings['analysis']['default_k_value']
+    return 3  # Agar database mein kuch na mile toh default 3 lelo
 @app.post("/api/analyze")
 async def analyze_polarization(
     request: AnalysisRequest,
