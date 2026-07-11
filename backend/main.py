@@ -1105,23 +1105,26 @@ async def apify_webhook(request: dict, background_tasks: BackgroundTasks):
                 
                 # Try ALL_INPUT
                 if not category:
-                    all_input = request.get("ALL_INPUT", {})
-                    if isinstance(all_input, dict):
-                        search = all_input.get("search", [])
-                        if search and len(search) > 0:
-                            category = search[0]
-                        elif all_input.get("category"):
-                            category = all_input.get("category")
-                
-                # Try resource
-                if not category:
-                    resource = request.get("resource", {})
-                    if isinstance(resource, dict):
-                        input_data = resource.get("input", {})
-                        if isinstance(input_data, dict):
-                            search = input_data.get("search", [])
-                            if search and len(search) > 0:
-                                category = search[0]
+                    input_data = request.get("input", {})
+                    start_urls = input_data.get("startUrls", [])
+    
+                    if start_urls and len(start_urls) > 0:
+        # Option A: URL se q= parameter
+                        url = start_urls[0].get("url", "")
+                        if "q=" in url:
+                            import urllib.parse
+                            parsed = urllib.parse.urlparse(url)
+                            params = urllib.parse.parse_qs(parsed.query)
+                            if params.get("q"):
+                                category = params["q"][0]
+                                print(f"📂 Category from URL: {category}")
+        
+        # Option B: userData se category
+                    if not category:
+                        user_data = start_urls[0].get("userData", {})
+                        if user_data.get("category"):
+                            category = user_data.get("category")
+                            print(f"📂 Category from userData: {category}")
             
             # ✅ If still None, use "etsy" as fallback
             if not category:
