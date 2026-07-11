@@ -1086,16 +1086,22 @@ async def apify_webhook(request: dict, background_tasks: BackgroundTasks):
             
             # ✅ If category is None or starts with {{, try to get from input
             if not category or (isinstance(category, str) and category.startswith("{{")):
-                # Try to get from input
+            # Try to get from input
                 input_data = request.get("input", {})
                 if isinstance(input_data, dict):
-                    # ✅ Check if "search" array exists and has first item
-                    search = input_data.get("search", [])
-                    if search and len(search) > 0:
-                        category = search[0]  # "vintage" -> category = "vintage"
-                    # Check for category field directly
-                    elif input_data.get("category"):
-                        category = input_data.get("category")
+        # ✅ NEW: Get category from "keyword" field (Etsy)
+                    keyword = input_data.get("keyword")
+                    if keyword:
+                        category = keyword
+                        print(f"📂 Category from input.keyword: {category}")
+        # Fallback to "search" array
+            else:
+                search = input_data.get("search", [])
+                if search and len(search) > 0:
+                    category = search[0]
+                    print(f"📂 Category from input.search: {category}")
+                elif input_data.get("category"):
+                    category = input_data.get("category")
                 
                 # Try ALL_INPUT
                 if not category:
@@ -1249,6 +1255,30 @@ async def save_apify_csv(products: list, category: str, platform: str):
         df.to_csv(csv_path, index=False)
         
         print(f"✅ CSV saved: {csv_path} ({len(df)} products)")
+
+
+        # ✅ ========== NEW: Save raw data to database ==========
+        try:
+            from database import save_raw_products
+            
+            # Convert DataFrame to list of dicts
+            raw_products = df.to_dict('records')
+            
+            # Ensure each product has category
+            for p in raw_products:
+                if 'category' not in p or not p['category']:
+                    p['category'] = category
+            
+            save_raw_products(
+                platform=platform,
+                category=category,
+                products=raw_products
+            )
+            print(f"✅ Raw data stored in database for {category}")
+            
+        except Exception as e:
+            print(f"⚠️ Warning: Could not save raw data: {e}")
+        # ========================================================
         
         # ✅ Reload in memory
         global DARAZ_DATASETS, ETSY_DATASETS
@@ -1367,7 +1397,7 @@ def extract_daraz_products(subcategory, limit=100):
     
     return products
 
-def extract_etsy_products(subcategory, limit=100):
+def extract_etsy_products(subcategory, limit=40):
     products = []
     data = ETSY_DATASETS.get(subcategory.lower())
     if not data:
@@ -1413,7 +1443,7 @@ def extract_etsy_products(subcategory, limit=100):
             if favorites > 0:
                 popularity = min(1.0, favorites / 3000)
             elif reviews > 0:
-                popularity = min(1.0, reviews / 1000)  # Fallback using reviews
+                popularity = min(1.0, reviews / 1000)
             else:
                 popularity = 0.1
 

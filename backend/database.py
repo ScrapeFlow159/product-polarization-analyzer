@@ -87,6 +87,200 @@ def init_database():
     conn.close()
     print("✅ Database initialized successfully")
 
+
+# ============================================================
+# RAW PRODUCT DATA STORAGE (For Reproducibility)
+# ============================================================
+
+def init_raw_data_table():
+    """Create table for storing raw product data"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS raw_product_data (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                platform TEXT NOT NULL,
+                category TEXT NOT NULL,
+                product_name TEXT,
+                price REAL,
+                rating REAL,
+                reviews INTEGER,
+                popularity REAL,
+                seller TEXT,
+                brand TEXT,
+                product_url TEXT,
+                scraped_date DATE NOT NULL,
+                analysis_id INTEGER,
+                FOREIGN KEY (analysis_id) REFERENCES polarization_analysis(id)
+            )
+        ''')
+        
+        conn.commit()
+        conn.close()
+        print("✅ Raw product data table initialized")
+        
+    except Exception as e:
+        print(f"❌ Error creating raw data table: {e}")
+        traceback.print_exc()
+
+
+def save_raw_products(platform, category, products, analysis_id=None):
+    """Save raw product data to database"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        scraped_date = datetime.now().date()
+        saved_count = 0
+        
+        for product in products:
+            # Ensure all fields exist
+            product_name = str(product.get('name', product.get('title', '')))[:200]
+            price = float(product.get('price', 0))
+            rating = float(product.get('rating', 0))
+            reviews = int(product.get('reviews', product.get('reviewCount', 0)))
+            popularity = float(product.get('popularity', 0))
+            seller = str(product.get('seller', product.get('shopName', '')))[:50]
+            brand = str(product.get('brand', 'Unknown'))[:30]
+            product_url = str(product.get('url', product.get('listingUrl', '')))[:200]
+            
+            cursor.execute('''
+                INSERT INTO raw_product_data 
+                (platform, category, product_name, price, rating, reviews, 
+                 popularity, seller, brand, product_url, scraped_date, analysis_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                platform,
+                category,
+                product_name,
+                price,
+                rating,
+                reviews,
+                popularity,
+                seller,
+                brand,
+                product_url,
+                scraped_date,
+                analysis_id
+            ))
+            saved_count += 1
+        
+        conn.commit()
+        conn.close()
+        print(f"✅ Saved {saved_count} raw products for {platform}/{category}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error saving raw products: {e}")
+        traceback.print_exc()
+        return False
+
+
+def get_raw_products(platform=None, category=None, date=None, limit=100):
+    """Retrieve raw product data for verification"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        query = "SELECT * FROM raw_product_data WHERE 1=1"
+        params = []
+        
+        if platform:
+            query += " AND platform = ?"
+            params.append(platform)
+        if category:
+            query += " AND category = ?"
+            params.append(category)
+        if date:
+            query += " AND scraped_date = ?"
+            params.append(date)
+        
+        query += " ORDER BY scraped_date DESC LIMIT ?"
+        params.append(limit)
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+        
+        return [dict(row) for row in rows]
+        
+    except Exception as e:
+        print(f"❌ Error fetching raw products: {e}")
+        return []
+
+
+def get_category_stats(platform=None):
+    """Get statistics per category"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        query = '''
+            SELECT 
+                platform,
+                category,
+                COUNT(*) as total_products,
+                AVG(price) as avg_price,
+                AVG(rating) as avg_rating,
+                AVG(reviews) as avg_reviews,
+                MIN(scraped_date) as first_seen,
+                MAX(scraped_date) as last_seen
+            FROM raw_product_data
+        '''
+        params = []
+        
+        if platform:
+            query += " WHERE platform = ?"
+            params.append(platform)
+        
+        query += " GROUP BY platform, category ORDER BY total_products DESC"
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+        
+        return [dict(row) for row in rows]
+        
+    except Exception as e:
+        print(f"❌ Error getting category stats: {e}")
+        return []
+
+
+def delete_raw_products(platform=None, category=None, days_old=None):
+    """Delete raw products (for cleanup)"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        query = "DELETE FROM raw_product_data WHERE 1=1"
+        params = []
+        
+        if platform:
+            query += " AND platform = ?"
+            params.append(platform)
+        if category:
+            query += " AND category = ?"
+            params.append(category)
+        if days_old:
+            cutoff_date = (datetime.now() - timedelta(days=days_old)).date()
+            query += " AND scraped_date < ?"
+            params.append(cutoff_date)
+        
+        cursor.execute(query, params)
+        deleted = cursor.rowcount
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ Deleted {deleted} raw products")
+        return deleted
+        
+    except Exception as e:
+        print(f"❌ Error deleting raw products: {e}")
+        return 0
+
+
 def save_analysis_result(platform, category, analysis_type, analysis_date, 
                          total_products, polarization_score, polarization_level,
                          silhouette_score, clusters, feature_importance, top_products):
