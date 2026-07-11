@@ -1152,6 +1152,20 @@ async def apify_webhook(request: dict, background_tasks: BackgroundTasks):
         
         # ✅ Daraz format - direct products
         category = request.get("category", "unknown")
+
+# ✅ If category is "unknown", try to get from input
+        if category == "unknown":
+            input_data = request.get("input", {})
+            if isinstance(input_data, dict):
+        # Try to get category from input
+                input_category = input_data.get("category")
+                if input_category:
+                    category = input_category
+                    print(f"📂 Category from input: {category}")
+        # Try searchKeyword as fallback
+                elif input_data.get("searchKeyword"):
+                    category = input_data.get("searchKeyword")
+                    print(f"📂 Category from searchKeyword: {category}")
         products = request.get("products", [])
         platform = request.get("platform", "daraz")
         
