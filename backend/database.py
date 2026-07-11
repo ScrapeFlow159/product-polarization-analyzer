@@ -876,3 +876,4 @@ def save_setting(key, value):
 
 # Initialize database on module load
 init_database()
+init_raw_data_table()
