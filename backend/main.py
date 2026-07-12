@@ -1414,6 +1414,9 @@ def extract_daraz_products(subcategory, limit=100):
     
     return products
 def extract_etsy_products(subcategory, limit=40):
+    """
+    Extract Etsy products from scraped data and map to database schema
+    """
     products = []
     data = ETSY_DATASETS.get(subcategory.lower())
     if not data:
@@ -1423,65 +1426,62 @@ def extract_etsy_products(subcategory, limit=40):
         if len(products) >= limit:
             break
         try:
-            # ✅ Webhook schema ke hisaab se fields
+            # ✅ 1. Product Name
             name = str(item.get('name', ''))
-            
-            # ✅ Agar name empty hai toh skip karein
             if not name or len(name) < 3:
-                # Try to get from other fields
-                name = str(item.get('title', ''))
-                if not name or len(name) < 3:
-                    continue
+                continue
             
-            # ✅ Price from "price" or "currentPrice"
-            price = float(item.get('price', 0))
-            if price <= 0:
-                current_price = item.get('currentPrice', '0')
-                if isinstance(current_price, str):
-                    current_price = current_price.replace('$', '').replace(',', '').strip()
-                    try:
-                        price = float(current_price)
-                    except:
-                        price = 0
-                else:
-                    price = float(current_price) if current_price else 0
+            # ✅ 2. Price (from offers.price)
+            offers = item.get('offers', {})
+            price_str = offers.get('price', '0')
+            try:
+                price = float(price_str)
+            except:
+                price = 0.0
             
-            # ✅ Rating from "ratingScore" or "rating"
-            rating = float(item.get('ratingScore', item.get('rating', 0)))
+            # ✅ 3. Rating
+            rating = float(item.get('rating', 0))
             
-            # ✅ Reviews from "itemSold" or "reviewCount"
-            reviews = int(item.get('itemSold', item.get('reviewCount', 0)))
+            # ✅ 4. Reviews (reviewCount)
+            reviews = int(item.get('reviewCount', 0))
             
-            # ✅ Seller from "sellerName" or "shopName"
-            seller = str(item.get('sellerName', item.get('shopName', 'Unknown')))
-            if seller == 'nan' or not seller:
-                seller = 'Unknown'
-            
-            # ✅ Brand from "brandName"
-            brand = str(item.get('brandName', 'Etsy Handmade'))
+            # ✅ 5. Brand (from brand.slogan)
+            brand_obj = item.get('brand', {})
+            brand = str(brand_obj.get('slogan', brand_obj.get('brand', 'Etsy')))
             if brand == 'nan' or not brand:
-                brand = 'Etsy Handmade'
+                brand = 'Etsy'
             
-            # ✅ URL from "itemUrl" or "url"
-            product_url = str(item.get('itemUrl', item.get('url', '')))
+            # ✅ 6. URL
+            product_url = str(item.get('url', ''))
             
-            # ✅ Image
+            # ✅ 7. Seller (not in this output, but keep for compatibility)
+            seller = str(item.get('shopName', item.get('sellerName', 'Etsy Seller')))
+            if seller == 'nan' or not seller:
+                seller = 'Etsy Seller'
+            
+            # ✅ 8. Popularity (from favorites or reviews)
+            favorites = int(item.get('favorites', 0))
+            if favorites > 0:
+                popularity = min(1.0, favorites / 3000)
+            elif reviews > 0:
+                popularity = min(1.0, reviews / 1000)
+            else:
+                popularity = 0.0
+            
+            # ✅ 9. Image (optional)
             image = str(item.get('image', ''))
             
-            # ✅ Category
-            category_name = subcategory.lower()
-            
             products.append({
-                'name': name[:100],
+                'name': name[:200],
                 'price': price,
                 'rating': rating,
                 'reviews': reviews,
-                'popularity': 0.0,  # Will calculate later
-                'seller': seller[:50],
-                'brand': brand[:30],
+                'popularity': popularity,
+                'seller': seller[:100],
+                'brand': brand[:100],
                 'url': product_url[:200],
                 'image': image[:200],
-                'category': category_name
+                'category': subcategory.lower()
             })
             
         except Exception as e:
@@ -1489,6 +1489,7 @@ def extract_etsy_products(subcategory, limit=40):
             continue
     
     return products
+
 def normalize_features(products, weights=None):
     if not products:
         return products
