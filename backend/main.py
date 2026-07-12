@@ -1416,63 +1416,82 @@ def extract_daraz_products(subcategory, limit=100):
 import re
 
 def extract_etsy_products(subcategory, limit=40):
+    print("First item keys:", list(data[0].keys()) if data else None)
     products = []
     data = ETSY_DATASETS.get(subcategory.lower())
     if not data:
         raise Exception(f"No Etsy data found for subcategory: {subcategory}")
 
+    print(f"🔍 Processing {len(data)} items for category: {subcategory}")  # Debug
+
     for item in data:
         if len(products) >= limit:
             break
+            
         try:
-            # ✅ Name
-            name = str(item.get('name', ''))
-            if not name or len(name) < 3:
-                name = str(item.get('title', ''))
-                if not name or len(name) < 3:
-                    continue
-            
-            # ✅ Price - NESTED in "offers"
-            offers = item.get('offers', {})
-            price_str = offers.get('price', '0')
-            try:
-                price = float(price_str)
-            except:
-                price = 0.0
-            
-            # ✅ Rating
-            rating = float(item.get('rating', item.get('ratingScore', 0)))
-            
-            # ✅ Reviews
-            reviews = int(item.get('reviewCount', item.get('itemSold', 0)))
-            
-            # ✅ Brand
+            # === Name ===
+            name = str(item.get('name') or item.get('title') or "").strip()
+            if len(name) < 5:
+                continue
+
+            # === Price (Yeh sabse common galti hai) ===
+            price = 0.0
+            offers = item.get('offers')
+            if isinstance(offers, dict):
+                price_str = offers.get('price')
+                if price_str:
+                    try:
+                        price = float(str(price_str).replace('$', '').strip())
+                    except:
+                        pass
+            # Agar offers mein na mila to direct price try karo
+            if price == 0 and item.get('price'):
+                try:
+                    price = float(str(item.get('price')).replace('$', '').strip())
+                except:
+                    pass
+
+            # === Rating ===
+            rating = float(item.get('rating') or item.get('ratingScore') or 0)
+
+            # === Reviews ===
+            reviews = int(item.get('reviewCount') or item.get('itemSold') or 0)
+
+            # === Brand ===
             brand_obj = item.get('brand', {})
-            brand = str(brand_obj.get('slogan', brand_obj.get('brand', 'Etsy')))
-            
-            # ✅ Seller
-            seller = str(item.get('shopName', item.get('sellerName', 'Unknown')))
-            
-            # ✅ URL
-            product_url = str(item.get('url', item.get('itemUrl', '')))
-            
+            brand = ""
+            if isinstance(brand_obj, dict):
+                brand = brand_obj.get('slogan') or brand_obj.get('brand') or brand_obj.get('name', '')
+            brand = str(brand).strip() or "Etsy"
+
+            # === Seller ===
+            seller = str(
+                item.get('shopName') or 
+                item.get('sellerName') or 
+                brand or 
+                "Unknown"
+            ).strip()
+
+            # === URL ===
+            url = str(item.get('url') or item.get('itemUrl') or "").strip()
+
             products.append({
-                'name': name[:100],
+                'name': name[:120],
                 'price': price,
                 'rating': rating,
                 'reviews': reviews,
                 'popularity': 0.0,
-                'seller': seller[:50],
-                'brand': brand[:30],
-                'url': product_url[:200]
+                'seller': seller[:60],
+                'brand': brand[:40],
+                'url': url[:300]
             })
             
         except Exception as e:
-            print(f"⚠️ Error processing Etsy item: {e}")
+            print(f"⚠️ Error processing item: {e}")
             continue
     
+    print(f"✅ Successfully extracted {len(products)} products")
     return products
-
 def normalize_features(products, weights=None):
     if not products:
         return products
