@@ -96,12 +96,6 @@ app.post("/webhook/apify/etsy", async (req, res) => {
         console.log("🔥 ETSY WEBHOOK RECEIVED");
         const { runId, datasetId } = req.body;
         let category = "unknown";
-        
-        console.log("📦 Full Payload:", JSON.stringify(req.body, null, 2)); // ✅ DEBUG
-        
-       
-        console.log("📦 runId:", runId);
-        console.log("📦 datasetId:", datasetId);
 
         // Get category from run details
         if (runId) {
@@ -129,6 +123,7 @@ app.post("/webhook/apify/etsy", async (req, res) => {
             return res.status(200).send("OK - no datasetId");
         }
 
+        // ✅ Fetch COMPLETE data from Apify
         const url = `https://api.apify.com/v2/datasets/${datasetId}/items?clean=true&token=${APIFY_TOKEN}`;
         const { data: items } = await axios.get(url);
 
@@ -139,27 +134,12 @@ app.post("/webhook/apify/etsy", async (req, res) => {
 
         console.log(`📦 Etsy: ${items.length} items for ${category}`);
 
-        // ✅ Etsy items — field mapping required
-        const cleanedItems = items.map(item => ({
-            name: item.title || '',
-            itemId: item.listingId || '',
-            price: parseFloat(item.price) || 0,
-            currentPrice: `${item.currency || '$'} ${item.price || '0'}`,
-            brandName: 'Etsy Handmade',
-            sellerName: item.shopName || '',
-            ratingScore: parseFloat(item.rating) || 0,
-            itemSold: parseInt(item.reviewCount) || 0,
-            favorites: parseInt(item.favorites) || 0,
-            location: '',
-            image: item.image || item.imageUrl || '',
-            itemUrl: item.url || '',
-            listedOn: ''
-        }));
-
+        // ✅ SEND RAW DATA AS-IS - NO MODIFICATION!
+        // Directly forward the original items without cleaning/modifying
         const response = await axios.post(BACKEND_URL, {
             category: category,
-            products: cleanedItems,
-            count: cleanedItems.length,
+            products: items,  // ✅ RAW DATA (complete fields)
+            count: items.length,
             platform: "etsy"
         }, { timeout: 60000 });
 
@@ -168,6 +148,9 @@ app.post("/webhook/apify/etsy", async (req, res) => {
 
     } catch (error) {
         console.error("❌ Etsy WEBHOOK ERROR:", error.message);
+        if (error.response) {
+            console.error("   Backend response:", error.response.status, error.response.data);
+        }
         res.status(500).send("Error: " + error.message);
     }
 });
