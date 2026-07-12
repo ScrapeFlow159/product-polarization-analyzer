@@ -1418,70 +1418,61 @@ import re
 def extract_etsy_products(subcategory, limit=40):
     products = []
     data = ETSY_DATASETS.get(subcategory.lower())
-
     if not data:
         raise Exception(f"No Etsy data found for subcategory: {subcategory}")
 
     for item in data:
         if len(products) >= limit:
             break
-
         try:
-            # ✅ Name (fallback add karo)
-            name = str(item.get('name') or "Etsy Product")
-
-            # ✅ Price (from currentPrice)
-            price_str = item.get('currentPrice', '$ 0')
+            # ✅ Name
+            name = str(item.get('name', ''))
+            if not name or len(name) < 3:
+                name = str(item.get('title', ''))
+                if not name or len(name) < 3:
+                    continue
+            
+            # ✅ Price - NESTED in "offers"
+            offers = item.get('offers', {})
+            price_str = offers.get('price', '0')
             try:
-                price = float(re.sub(r'[^\d.]', '', price_str))
+                price = float(price_str)
             except:
                 price = 0.0
-
+            
             # ✅ Rating
-            rating = float(item.get('ratingScore', 0))
-
-            # ✅ Reviews (proxy from sales)
-            reviews = int(item.get('itemSold', 0))
-
+            rating = float(item.get('rating', item.get('ratingScore', 0)))
+            
+            # ✅ Reviews
+            reviews = int(item.get('reviewCount', item.get('itemSold', 0)))
+            
             # ✅ Brand
-            brand = "Etsy"
-
-            # ✅ URL
-            product_url = str(item.get('itemUrl', ''))
-
+            brand_obj = item.get('brand', {})
+            brand = str(brand_obj.get('slogan', brand_obj.get('brand', 'Etsy')))
+            
             # ✅ Seller
-            seller = str(item.get('sellerName', 'Etsy Seller'))
-
-            # ✅ Popularity
-            favorites = int(item.get('favorites', 0))
-            if favorites > 0:
-                popularity = min(1.0, favorites / 3000)
-            elif reviews > 0:
-                popularity = min(1.0, reviews / 1000)
-            else:
-                popularity = 0.0
-
-            # ✅ Image
-            image = str(item.get('image', ''))
-
+            seller = str(item.get('shopName', item.get('sellerName', 'Unknown')))
+            
+            # ✅ URL
+            product_url = str(item.get('url', item.get('itemUrl', '')))
+            
             products.append({
-                'name': name[:200],
+                'name': name[:100],
                 'price': price,
                 'rating': rating,
                 'reviews': reviews,
-                'popularity': popularity,
-                'seller': seller[:100],
-                'brand': brand[:100],
-                'url': product_url[:200],
-                'image': image[:200],
-                'category': subcategory.lower()
+                'popularity': 0.0,
+                'seller': seller[:50],
+                'brand': brand[:30],
+                'url': product_url[:200]
             })
-
+            
         except Exception as e:
             print(f"⚠️ Error processing Etsy item: {e}")
             continue
-    print("FIELDS:", item.keys())
+    
     return products
+
 def normalize_features(products, weights=None):
     if not products:
         return products
