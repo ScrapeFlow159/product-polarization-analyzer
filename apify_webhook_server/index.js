@@ -7,13 +7,8 @@ app.use(bodyParser.json());
 
 const APIFY_TOKEN = "apify_api_HlY6edMSwNJqptH4B2FWttNUIIbHKV0z1JTy";
 
-// ✅ BACKEND URL (Railway backend ka URL)
-// ✅ Railway internal URL (public URL ki jagah)
-const BACKEND_URL = process.env.BACKEND_URL; 
-// Agar variable set nahi hai, toh log error de
-if (!BACKEND_URL) {
-    console.error("❌ ERROR: BACKEND_URL environment variable is not set!");
-}
+const BACKEND_URL = process.env.BACKEND_URL || "https://product-polarization-analyzer-production.up.railway.app/api/apify-webhook";
+
 process.on('uncaughtException', (err) => {
     console.log('⚠️ Uncaught Exception:', err.message);
 });
@@ -21,109 +16,53 @@ process.on('unhandledRejection', (reason) => {
     console.log('⚠️ Unhandled Rejection:', reason);
 });
 
+// ============================================================
+// DARAZ WEBHOOK
+// ============================================================
 app.post("/webhook/apify/daraz", async (req, res) => {
     try {
-        console.log("🔥 WEBHOOK RECEIVED");
+        console.log("🔥 DARAZ WEBHOOK RECEIVED");
+        console.log("📦 Full Payload:", JSON.stringify(req.body, null, 2));
 
-        const { runId, datasetId } = req.body;
-        
-        let category = "unknown";
+        // ✅ STEP 1: Direct payload se category lein
+        let category = req.body.category || "unknown";
+        console.log("📂 Category from payload:", category);
 
-        // Get category from run details
-        if (runId) {
-            try {
-                const runUrl = `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`;
-                const runResponse = await axios.get(runUrl);
-                const runData = runResponse.data.data;
-                
-                const taskId = runData.actorTaskId;
-                
-                if (taskId) {
-                    const taskUrl = `https://api.apify.com/v2/actor-tasks/${taskId}?token=${APIFY_TOKEN}`;
-                    const taskResponse = await axios.get(taskUrl);
-                    const taskInput = taskResponse.data.data.input;
-                    category = taskInput.category || taskInput.search_keyword || "unknown";
-                    console.log("📦 CATEGORY FROM TASK:", category);
-                } else {
-                    const runInput = runData.input;
-                    category = runInput.category || runInput.search_keyword || "unknown";
-                    console.log("📦 CATEGORY FROM RUN INPUT:", category);
+        // ✅ STEP 2: Agar unknown hai toh input se lein
+        if (category === "unknown") {
+            const inputData = req.body.input || {};
+            category = inputData.category || inputData.searchKeyword || "unknown";
+            console.log("📂 Category from input:", category);
+        }
+
+        // ✅ STEP 3: Agar phir bhi unknown hai toh task se fetch karein (fallback)
+        if (category === "unknown") {
+            const { runId } = req.body;
+            if (runId) {
+                try {
+                    const runUrl = `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`;
+                    const runResponse = await axios.get(runUrl);
+                    const runData = runResponse.data.data;
+                    const taskId = runData.actorTaskId;
+                    
+                    if (taskId) {
+                        const taskUrl = `https://api.apify.com/v2/actor-tasks/${taskId}?token=${APIFY_TOKEN}`;
+                        const taskResponse = await axios.get(taskUrl);
+                        const taskInput = taskResponse.data.data.input;
+                        category = taskInput.category || taskInput.searchKeyword || "unknown";
+                        console.log("📂 Category from task:", category);
+                    }
+                } catch (err) {
+                    console.log("Could not fetch task details:", err.message);
                 }
-            } catch (err) {
-                console.log("Could not fetch details:", err.message);
             }
         }
 
+        const { datasetId } = req.body;
         if (!datasetId) {
             return res.status(200).send("OK - no datasetId");
         }
 
-        // ✅ Fetch dataset items from Apify
-        const url = `https://api.apify.com/v2/datasets/${datasetId}/items?clean=true&token=${APIFY_TOKEN}`;
-        const { data: items } = await axios.get(url);
-
-        if (!items || items.length === 0) {
-            console.log("No items found in dataset");
-            return res.status(200).send("No items found");
-        }
-
-        console.log(`📦 Received ${items.length} items for category: ${category}`);
-
-        // ✅ FORWARD TO BACKEND (CSV save nahi karega, backend karega)
-        const response = await axios.post(BACKEND_URL, {
-            category: category,
-            products: items,
-            count: items.length,
-            platform: "daraz"
-        }, { timeout: 60000 });  // ✅ 60 seconds timeout
-
-        console.log(`✅ Forwarded ${items.length} items to backend`);
-        console.log(`   Backend response: ${response.status}`);
-
-        res.status(200).send("OK");
-
-    } catch (error) {
-        console.error("❌ WEBHOOK ERROR:", error.message);
-        if (error.response) {
-            console.error("   Backend response:", error.response.status, error.response.data);
-        }
-        res.status(500).send("Error: " + error.message);
-    }
-});
-
-app.post("/webhook/apify/etsy", async (req, res) => {
-    try {
-        console.log("🔥 ETSY WEBHOOK RECEIVED");
-        const { runId, datasetId } = req.body;
-        let category = "unknown";
-
-        // Get category from run details
-        if (runId) {
-            try {
-                const runUrl = `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`;
-                const runResponse = await axios.get(runUrl);
-                const runData = runResponse.data.data;
-                const taskId = runData.actorTaskId;
-                
-                if (taskId) {
-                    const taskUrl = `https://api.apify.com/v2/actor-tasks/${taskId}?token=${APIFY_TOKEN}`;
-                    const taskResponse = await axios.get(taskUrl);
-                    const taskInput = taskResponse.data.data.input;
-                    category = taskInput.category || taskInput.search_keyword || "unknown";
-                } else {
-                    const runInput = runData.input;
-                    category = runInput.category || runInput.search_keyword || "unknown";
-                }
-            } catch (err) {
-                console.log("Could not fetch details:", err.message);
-            }
-        }
-
-        if (!datasetId) {
-            return res.status(200).send("OK - no datasetId");
-        }
-
-        // ✅ Fetch COMPLETE data from Apify
         const url = `https://api.apify.com/v2/datasets/${datasetId}/items?clean=true&token=${APIFY_TOKEN}`;
         const { data: items } = await axios.get(url);
 
@@ -132,13 +71,87 @@ app.post("/webhook/apify/etsy", async (req, res) => {
             return res.status(200).send("No items found");
         }
 
-        console.log(`📦 Etsy: ${items.length} items for ${category}`);
+        console.log(`📦 Daraz: ${items.length} items for category: ${category}`);
 
-        // ✅ SEND RAW DATA AS-IS - NO MODIFICATION!
-        // Directly forward the original items without cleaning/modifying
         const response = await axios.post(BACKEND_URL, {
             category: category,
-            products: items,  // ✅ RAW DATA (complete fields)
+            products: items,
+            count: items.length,
+            platform: "daraz"
+        }, { timeout: 60000 });
+
+        console.log(`✅ Daraz forwarded: ${response.status}`);
+        res.status(200).send("OK");
+
+    } catch (error) {
+        console.error("❌ Daraz WEBHOOK ERROR:", error.message);
+        if (error.response) {
+            console.error("   Backend response:", error.response.status, error.response.data);
+        }
+        res.status(500).send("Error: " + error.message);
+    }
+});
+
+// ============================================================
+// ETSY WEBHOOK
+// ============================================================
+app.post("/webhook/apify/etsy", async (req, res) => {
+    try {
+        console.log("🔥 ETSY WEBHOOK RECEIVED");
+        console.log("📦 Full Payload:", JSON.stringify(req.body, null, 2));
+
+        // ✅ STEP 1: Direct payload se category lein
+        let category = req.body.category || req.body.keyword || "unknown";
+        console.log("📂 Category from payload:", category);
+
+        // ✅ STEP 2: Agar unknown hai toh input se lein
+        if (category === "unknown") {
+            const inputData = req.body.input || {};
+            category = inputData.keyword || inputData.category || "unknown";
+            console.log("📂 Category from input:", category);
+        }
+
+        // ✅ STEP 3: Agar phir bhi unknown hai toh task se fetch karein (fallback)
+        if (category === "unknown") {
+            const { runId } = req.body;
+            if (runId) {
+                try {
+                    const runUrl = `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`;
+                    const runResponse = await axios.get(runUrl);
+                    const runData = runResponse.data.data;
+                    const taskId = runData.actorTaskId;
+                    
+                    if (taskId) {
+                        const taskUrl = `https://api.apify.com/v2/actor-tasks/${taskId}?token=${APIFY_TOKEN}`;
+                        const taskResponse = await axios.get(taskUrl);
+                        const taskInput = taskResponse.data.data.input;
+                        category = taskInput.keyword || taskInput.category || "unknown";
+                        console.log("📂 Category from task:", category);
+                    }
+                } catch (err) {
+                    console.log("Could not fetch task details:", err.message);
+                }
+            }
+        }
+
+        const { datasetId } = req.body;
+        if (!datasetId) {
+            return res.status(200).send("OK - no datasetId");
+        }
+
+        const url = `https://api.apify.com/v2/datasets/${datasetId}/items?clean=true&token=${APIFY_TOKEN}`;
+        const { data: items } = await axios.get(url);
+
+        if (!items || items.length === 0) {
+            console.log("No items found");
+            return res.status(200).send("No items found");
+        }
+
+        console.log(`📦 Etsy: ${items.length} items for category: ${category}`);
+
+        const response = await axios.post(BACKEND_URL, {
+            category: category,
+            products: items,
             count: items.length,
             platform: "etsy"
         }, { timeout: 60000 });
@@ -155,15 +168,15 @@ app.post("/webhook/apify/etsy", async (req, res) => {
     }
 });
 
-
-// Debug endpoint
+// ============================================================
+// DEBUG & HEALTH
+// ============================================================
 app.post("/webhook/apify/debug", (req, res) => {
     console.log("🔍 DEBUG - Webhook payload received");
     console.log(JSON.stringify(req.body, null, 2));
     res.status(200).send("Logged");
 });
 
-// Health check
 app.get("/health", (req, res) => {
     res.status(200).send("OK");
 });
