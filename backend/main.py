@@ -1239,30 +1239,18 @@ async def fetch_apify_products(dataset_id: str, category: str, platform: str):
         traceback.print_exc()
         
 async def save_apify_csv(products: list, category: str, platform: str):
+    """
+    Save Apify products to CSV and reload in memory
+    Uses separate tables for Daraz and Etsy
+    """
     try:
         import pandas as pd
         import os
         
         print(f"💾 Saving {len(products)} products for {category}...")
         
+        # Convert to DataFrame
         df = pd.DataFrame(products)
-        
-        # ✅ Clean column names for Daraz/Etsy
-        if platform.lower() == "daraz":
-            # ✅ Sirf missing fields rename karein
-            if 'name' not in df.columns and 'title' in df.columns:
-                df.rename(columns={'title': 'name'}, inplace=True)
-            if 'price' not in df.columns and 'product_price' in df.columns:
-                df.rename(columns={'product_price': 'price'}, inplace=True)
-            # ❌ ratingScore already hai, rename mat karo!
-            # ❌ itemSold already hai, rename mat karo!
-            
-            # ✅ DEBUG: Check columns
-            print(f"🔍 Daraz CSV columns: {df.columns.tolist()}")
-            if 'ratingScore' in df.columns:
-                print(f"   ratingScore sample: {df['ratingScore'].iloc[0] if len(df) > 0 else 'N/A'}")
-            if 'itemSold' in df.columns:
-                print(f"   itemSold sample: {df['itemSold'].iloc[0] if len(df) > 0 else 'N/A'}")
         
         # ✅ Save to CSV
         base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1274,39 +1262,34 @@ async def save_apify_csv(products: list, category: str, platform: str):
         
         print(f"✅ CSV saved: {csv_path} ({len(df)} products)")
         
-        # ✅ ========== Save raw data to database ==========
+        # ✅ Save to respective table based on platform
         try:
-            from database import save_raw_products
-            
-            raw_products = df.to_dict('records')
-            for p in raw_products:
-                if 'category' not in p or not p['category']:
-                    p['category'] = category
-            
-            save_raw_products(
-                platform=platform,
-                category=category,
-                products=raw_products
-            )
+            if platform.lower() == "daraz":
+                from database import save_daraz_raw_products
+                save_daraz_raw_products(category, products)
+            else:
+                from database import save_etsy_raw_products
+                save_etsy_raw_products(category, products)
+                
             print(f"✅ Raw data stored in database for {category}")
             
         except Exception as e:
             print(f"⚠️ Warning: Could not save raw data: {e}")
-        # ========================================================
         
         # ✅ Reload in memory
         global DARAZ_DATASETS, ETSY_DATASETS
         
         if platform.lower() == "daraz":
-            DARAZ_DATASETS[category] = df.to_dict('records')
+            DARAZ_DATASETS[category] = products
             print(f"✅ Daraz data reloaded: {category} ({len(DARAZ_DATASETS[category])} products)")
         else:
-            ETSY_DATASETS[category] = df.to_dict('records')
+            ETSY_DATASETS[category] = products
             print(f"✅ Etsy data reloaded: {category} ({len(ETSY_DATASETS[category])} products)")
             
     except Exception as e:
-        print(f"❌ Error saving CSV: {e}")
+        print(f"❌ Error saving: {e}")
         traceback.print_exc()
+
 load_csv_data()
 
 from database import migrate_database

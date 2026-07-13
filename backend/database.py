@@ -92,16 +92,16 @@ def init_database():
 # RAW PRODUCT DATA STORAGE (For Reproducibility)
 # ============================================================
 
-def init_raw_data_table():
-    """Create table for storing raw product data"""
+# ============================================================
+# DARAZ RAW DATA TABLE
+# ============================================================
+def init_daraz_raw_table():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS raw_product_data (
+            CREATE TABLE IF NOT EXISTS daraz_raw_products (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                platform TEXT NOT NULL,
                 category TEXT NOT NULL,
                 product_name TEXT,
                 price REAL,
@@ -112,90 +112,158 @@ def init_raw_data_table():
                 brand TEXT,
                 product_url TEXT,
                 scraped_date DATE NOT NULL,
-                analysis_id INTEGER,
-                FOREIGN KEY (analysis_id) REFERENCES polarization_analysis(id)
+                analysis_id INTEGER
             )
         ''')
-        
         conn.commit()
         conn.close()
-        print("✅ Raw product data table initialized")
-        
+        print("✅ Daraz raw products table initialized")
     except Exception as e:
-        print(f"❌ Error creating raw data table: {e}")
-        traceback.print_exc()
+        print(f"❌ Error: {e}")
 
-
-def save_raw_products(platform, category, products, analysis_id=None):
-    """Save raw product data to database"""
+# ============================================================
+# ETSY RAW DATA TABLE
+# ============================================================
+def init_etsy_raw_table():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS etsy_raw_products (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category TEXT NOT NULL,
+                product_name TEXT,
+                price REAL,
+                rating REAL,
+                reviews INTEGER,
+                popularity REAL,
+                seller TEXT,
+                brand TEXT,
+                product_url TEXT,
+                scraped_date DATE NOT NULL,
+                analysis_id INTEGER
+            )
+        ''')
+        conn.commit()
+        conn.close()
+        print("✅ Etsy raw products table initialized")
+    except Exception as e:
+        print(f"❌ Error: {e}")
+def save_daraz_raw_products(category, products):
+    """Save Daraz products to daraz_raw_products table"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
         scraped_date = datetime.now().date()
         saved_count = 0
         
-        for product in products:
-            # Ensure all fields exist
-            product_name = str(product.get('name', product.get('title', '')))[:200]
-            price = float(product.get('price', 0))
-            rating = float(product.get('rating', 0))
-            reviews = int(product.get('reviews', product.get('reviewCount', 0)))
-            popularity = float(product.get('popularity', 0))
-            seller = str(product.get('seller', product.get('shopName', '')))[:50]
-            brand = str(product.get('brand', 'Unknown'))[:30]
-            product_url = str(product.get('url', product.get('listingUrl', '')))[:200]
+        for p in products:
+            # ✅ Daraz specific fields
+            product_name = str(p.get('name', ''))[:200]
+            price = float(p.get('price', 0))
+            rating = float(p.get('ratingScore', p.get('rating', 0)))
+            reviews = int(p.get('itemSold', p.get('reviews', 0)))
+            seller = str(p.get('sellerName', ''))[:50]
+            brand = str(p.get('brandName', 'No Brand'))[:30]
+            product_url = str(p.get('itemUrl', ''))[:200]
             
             cursor.execute('''
-                INSERT INTO raw_product_data 
-                (platform, category, product_name, price, rating, reviews, 
-                 popularity, seller, brand, product_url, scraped_date, analysis_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO daraz_raw_products 
+                (category, product_name, price, rating, reviews, popularity, 
+                 seller, brand, product_url, scraped_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                platform,
                 category,
                 product_name,
                 price,
                 rating,
                 reviews,
-                popularity,
+                0.0,  # popularity (calculate later)
                 seller,
                 brand,
                 product_url,
-                scraped_date,
-                analysis_id
+                scraped_date
             ))
             saved_count += 1
         
         conn.commit()
         conn.close()
-        print(f"✅ Saved {saved_count} raw products for {platform}/{category}")
+        print(f"✅ Saved {saved_count} Daraz products for {category}")
         return True
-        
     except Exception as e:
-        print(f"❌ Error saving raw products: {e}")
+        print(f"❌ Error saving Daraz products: {e}")
         traceback.print_exc()
         return False
 
 
-def get_raw_products(platform=None, category=None, date=None, limit=100):
-    """Retrieve raw product data for verification"""
+def save_etsy_raw_products(category, products):
+    """Save Etsy products to etsy_raw_products table"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        scraped_date = datetime.now().date()
+        saved_count = 0
+        
+        for p in products:
+            # ✅ Etsy specific fields
+            product_name = str(p.get('name', p.get('title', '')))[:200]
+            
+            # Price from offers
+            price = 0.0
+            offers = p.get('offers', {})
+            if offers:
+                try:
+                    price = float(offers.get('price', 0))
+                except:
+                    price = 0
+            
+            rating = float(p.get('rating', p.get('ratingScore', 0)))
+            reviews = int(p.get('reviewCount', p.get('itemSold', 0)))
+            seller = str(p.get('shopName', p.get('sellerName', '')))[:50]
+            brand = 'Etsy'
+            product_url = str(p.get('url', p.get('itemUrl', '')))[:200]
+            
+            cursor.execute('''
+                INSERT INTO etsy_raw_products 
+                (category, product_name, price, rating, reviews, popularity, 
+                 seller, brand, product_url, scraped_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                category,
+                product_name,
+                price,
+                rating,
+                reviews,
+                0.0,  # popularity (calculate later)
+                seller,
+                brand,
+                product_url,
+                scraped_date
+            ))
+            saved_count += 1
+        
+        conn.commit()
+        conn.close()
+        print(f"✅ Saved {saved_count} Etsy products for {category}")
+        return True
+    except Exception as e:
+        print(f"❌ Error saving Etsy products: {e}")
+        traceback.print_exc()
+        return False
+
+
+def get_daraz_raw_products(category=None, limit=100):
+    """Get Daraz raw products"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        query = "SELECT * FROM raw_product_data WHERE 1=1"
+        query = "SELECT * FROM daraz_raw_products"
         params = []
         
-        if platform:
-            query += " AND platform = ?"
-            params.append(platform)
         if category:
-            query += " AND category = ?"
+            query += " WHERE category = ?"
             params.append(category)
-        if date:
-            query += " AND scraped_date = ?"
-            params.append(date)
         
         query += " ORDER BY scraped_date DESC LIMIT ?"
         params.append(limit)
@@ -205,82 +273,35 @@ def get_raw_products(platform=None, category=None, date=None, limit=100):
         conn.close()
         
         return [dict(row) for row in rows]
-        
     except Exception as e:
-        print(f"❌ Error fetching raw products: {e}")
+        print(f"❌ Error: {e}")
         return []
 
 
-def get_category_stats(platform=None):
-    """Get statistics per category"""
+def get_etsy_raw_products(category=None, limit=100):
+    """Get Etsy raw products"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        query = '''
-            SELECT 
-                platform,
-                category,
-                COUNT(*) as total_products,
-                AVG(price) as avg_price,
-                AVG(rating) as avg_rating,
-                AVG(reviews) as avg_reviews,
-                MIN(scraped_date) as first_seen,
-                MAX(scraped_date) as last_seen
-            FROM raw_product_data
-        '''
+        query = "SELECT * FROM etsy_raw_products"
         params = []
         
-        if platform:
-            query += " WHERE platform = ?"
-            params.append(platform)
+        if category:
+            query += " WHERE category = ?"
+            params.append(category)
         
-        query += " GROUP BY platform, category ORDER BY total_products DESC"
+        query += " ORDER BY scraped_date DESC LIMIT ?"
+        params.append(limit)
         
         cursor.execute(query, params)
         rows = cursor.fetchall()
         conn.close()
         
         return [dict(row) for row in rows]
-        
     except Exception as e:
-        print(f"❌ Error getting category stats: {e}")
+        print(f"❌ Error: {e}")
         return []
-
-
-def delete_raw_products(platform=None, category=None, days_old=None):
-    """Delete raw products (for cleanup)"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        query = "DELETE FROM raw_product_data WHERE 1=1"
-        params = []
-        
-        if platform:
-            query += " AND platform = ?"
-            params.append(platform)
-        if category:
-            query += " AND category = ?"
-            params.append(category)
-        if days_old:
-            cutoff_date = (datetime.now() - timedelta(days=days_old)).date()
-            query += " AND scraped_date < ?"
-            params.append(cutoff_date)
-        
-        cursor.execute(query, params)
-        deleted = cursor.rowcount
-        conn.commit()
-        conn.close()
-        
-        print(f"✅ Deleted {deleted} raw products")
-        return deleted
-        
-    except Exception as e:
-        print(f"❌ Error deleting raw products: {e}")
-        return 0
-
-
 def save_analysis_result(platform, category, analysis_type, analysis_date, 
                          total_products, polarization_score, polarization_level,
                          silhouette_score, clusters, feature_importance, top_products):
@@ -876,4 +897,5 @@ def save_setting(key, value):
 
 # Initialize database on module load
 init_database()
-init_raw_data_table()
+init_daraz_raw_table()
+init_etsy_raw_table()
