@@ -1,88 +1,56 @@
-import threading
-import time
-from datetime import datetime, timedelta
+from apscheduler.schedulers.background import BackgroundScheduler
+from datetime import datetime
+import os
 import requests
-import json
+import logging
 
-class PolarizationScheduler:
-    """Scheduler for automatic weekly data collection"""
-    
-    def __init__(self, api_url="http://localhost:8000"):
-        self.api_url = api_url
-        self.is_running = False
-        self.thread = None
-        self.categories = {
-            'daraz': ['earpods', 'powerbanks', 'gaming_accessories', 'mobile_phone_accessories', 'smart_watches'],
-            'etsy': ['art', 'handmade', 'jewelry', 'vintage', 'accessories']
-        }
-    
-    def start(self):
-        """Start the scheduler"""
-        self.is_running = True
-        self.thread = threading.Thread(target=self._run_scheduler, daemon=True)
-        self.thread.start()
-        print("📅 Weekly collection scheduler started")
-    
-    def stop(self):
-        """Stop the scheduler"""
-        self.is_running = False
-        print("📅 Weekly collection scheduler stopped")
-    
-    def _run_scheduler(self):
-        """Main scheduler loop"""
-        while self.is_running:
-            now = datetime.now()
-            
-            # Check if it's Sunday at midnight (00:00)
-            if now.weekday() == 6 and now.hour == 0 and now.minute == 0:
-                print(f"\n📊 Running weekly data collection at {now}")
-                self.collect_weekly_data()
-                # Wait 24 hours before next check
-                time.sleep(86400)
-            else:
-                # Check every hour
-                time.sleep(3600)
-    
-    def collect_weekly_data(self):
-        """Collect weekly data for all categories"""
-        for platform, categories in self.categories.items():
-            for category in categories:
-                try:
-                    print(f"  📡 Collecting {platform}/{category}...")
-                    
-                    response = requests.post(
-                        f"{self.api_url}/api/analyze-and-save",
-                        json={
-                            'platform': platform,
-                            'category': category,
-                            'subcategory': category,
-                            'analysis_type': 'weekly',
-                            'max_products': 50,
-                            'save_to_db': True
-                        },
-                        timeout=60
-                    )
-                    
-                    if response.status_code == 200:
-                        print(f"    ✅ Successfully saved {platform}/{category}")
-                    else:
-                        print(f"    ❌ Failed: {response.status_code}")
-                        
-                except Exception as e:
-                    print(f"    ❌ Error: {str(e)}")
-                
-                # Small delay between requests
-                time.sleep(2)
-        
-        print(f"✅ Weekly collection completed at {datetime.now()}")
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Global scheduler instance
-scheduler = PolarizationScheduler()
+API_BASE_URL = os.getenv("API_BASE_URL", "https://product-polarization-analyzer-production.up.railway.app")
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "daily_analysis_key")
+
+PLATFORMS = {
+    "daraz": ["earpods", "powerbanks", "gaming_accessories", "mobile_phone_accessories", "smart_watches"],
+    "etsy": ["wall art", "handmade gifts", "jewelry", "vintage", "accessories"]
+}
+
+def run_daily_analysis():
+    logging.info(f"🚀 Daily Analysis Started at {datetime.now()}")
+    success, failed = 0, 0
+    
+    for platform, categories in PLATFORMS.items():
+        for category in categories:
+            try:
+                response = requests.post(
+                    f"{API_BASE_URL}/api/analyze-internal",
+                    json={
+                        "platform": "DARAZ.PK" if platform == "daraz" else "ETSY.COM",
+                        "category": category,
+                        "subcategory": category,
+                        "max_products": 100,
+                        "analysis_type": "current",
+                        "save_to_db": True,
+                        "k_value": None,
+                        "weights": None
+                    },
+                    headers={"Content-Type": "application/json", "X-API-Key": INTERNAL_API_KEY},
+                    timeout=120
+                )
+                if response.status_code == 200:
+                    logging.info(f"✅ {platform}/{category} - Score: {response.json().get('polarization_score', 'N/A')}")
+                    success += 1
+                else:
+                    logging.error(f"❌ {platform}/{category} - Failed: {response.status_code}")
+                    failed += 1
+            except Exception as e:
+                logging.error(f"❌ {platform}/{category} - Error: {e}")
+                failed += 1
+    
+    logging.info(f"📊 Complete - Success: {success}, Failed: {failed}")
 
 def start_scheduler():
-    """Start the background scheduler"""
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(run_daily_analysis, 'cron', hour=2, minute=0)
     scheduler.start()
-
-def stop_scheduler():
-    """Stop the background scheduler"""
-    scheduler.stop()
+    logging.info("✅ Daily Scheduler Started - 2:00 AM Daily")
+    return scheduler
