@@ -1508,7 +1508,7 @@ function closeModal() {
         
         const AVAILABLE_CATEGORIES = {
             daraz: ['Earpods', 'Powerbanks', 'Mobile phone accessories', 'Gaming accessories', 'Smart watches'],
-            etsy: ['Art', 'Handmade', 'Jewelry', 'Vintage', 'Accessories']
+            etsy: ['Wall art', 'Handmade gifts', 'Jewelry', 'Vintage', 'Accessories']
         };
 
         // State for each page
@@ -2164,44 +2164,35 @@ async function runAnalysis(page) {
         const role = (localStorage.getItem('role') || 'User').trim();
         const token = localStorage.getItem('token');
 
-        // ✅ STEP 1: Get system default K from Admin Settings
+        // ✅ Get system default K
         const systemK = await getSystemDefaultK();
         console.log(`📊 System Default K from Admin: ${systemK}`);
 
-        // ✅ STEP 2: Check if user manually changed the input
         const kEl = document.getElementById('kValue');
         let userK = kEl ? parseInt(kEl.value) || null : null;
 
         let k_value;
 
-        // ✅ Priority 1: User manual selection (if they changed it from default)
         if (userK !== null && userK !== systemK) {
             k_value = userK;
             console.log(`👤 User manually selected K=${k_value}`);
-        }
-        // ✅ Priority 2: Research Analyst saved params (only if user didn't manually change)
-        else if (role && role.toLowerCase() === 'research analyst') {
+        } else if (role && role.toLowerCase() === 'research analyst') {
             const saved = await fetchSavedParameters();
             if (saved && saved.k_value) {
                 k_value = saved.k_value;
                 console.log(`🔬 Research Analyst saved K=${k_value}`);
             } else {
                 k_value = systemK;
-                console.log(`🔬 Research Analyst - no saved params, using system default K=${systemK}`);
             }
-        }
-        // ✅ Priority 3: System default (Admin settings)
-        else {
+        } else {
             k_value = systemK;
             console.log(`👤 ${role} - using system default K=${systemK}`);
         }
 
-        // ✅ Update input field to show actual value being used
         if (kEl) {
             kEl.value = k_value;
         }
 
-        // ✅ Get weights (always from modal - user can adjust)
         const weights = {
             price: parseFloat(document.getElementById('priceWeight')?.value) || 1.0,
             rating: parseFloat(document.getElementById('ratingWeight')?.value) || 1.0,
@@ -2211,40 +2202,57 @@ async function runAnalysis(page) {
 
         console.log(`🚀 SENDING TO BACKEND → K=${k_value}`, weights);
 
-        // Send analysis for each category
+        // ✅ Send analysis for each category
+        let hasError = false;
         for (let category of state.selected) {
-            const response = await fetch(`${API_BASE_URL}/api/analyze?username=${encodeURIComponent(username)}&role=${encodeURIComponent(role)}`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    platform: backendPlatform,
-                    category: category,
-                    subcategory: category,
-                    max_products: 50,
-                    analysis_type: analysisType,
-                    save_to_db: true,
-                    k_value: k_value,
-                    weights: weights
-                })
-            });
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/analyze?username=${encodeURIComponent(username)}&role=${encodeURIComponent(role)}`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        platform: backendPlatform,
+                        category: category,
+                        subcategory: category,
+                        max_products: 50,
+                        analysis_type: analysisType,
+                        save_to_db: true,
+                        k_value: k_value,
+                        weights: weights
+                    })
+                });
 
-            if (response.ok) {
-                const data = await response.json();
-                state.results[category] = data;
-            } else {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.detail || `HTTP ${response.status}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    state.results[category] = data;
+                    console.log(`✅ Analysis complete for ${category}`);
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    console.error(`❌ Error for ${category}:`, errorData);
+                    alert(`❌ Analysis failed for ${category}: ${errorData.detail || 'Unknown error'}`);
+                    hasError = true;
+                    break;
+                }
+            } catch (error) {
+                console.error(`❌ Network error for ${category}:`, error);
+                alert(`❌ Network error for ${category}. Please try again.`);
+                hasError = true;
+                break;
             }
         }
 
-        displayResults(page);
+        // ✅ Only display results if no error occurred
+        if (!hasError && Object.keys(state.results).length > 0) {
+            displayResults(page);
+        } else {
+            console.log('⚠️ Analysis failed or no results to display');
+        }
 
     } catch (error) {
         console.error('❌ Error:', error);
-        alert(`Error: ${error.message}`);
+        alert(`❌ Error: ${error.message}`);
     } finally {
         setLoading(page, false);
         if (analyzeBtn) analyzeBtn.disabled = false;
