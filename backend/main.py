@@ -1063,103 +1063,72 @@ def load_csv_data():
 async def apify_webhook(request: dict, background_tasks: BackgroundTasks):
     """
     Apify webhook handler - receives data from webhook service and saves CSV
-    Supports both Daraz and Etsy formats
     """
     try:
         print("\n" + "="*60)
-        print("🔥 WEBHOOK RECEIVED FROM APIFY")
+        print("🔥 WEBHOOK RECEIVED")
         print("="*60)
         print(f"📦 Full Payload: {json.dumps(request, indent=2)}")
         
-        # ✅ STEP 1: Get platform and category from payload
+        # ✅ Platform
         platform = request.get("platform", "daraz")
+        
+        # ✅ Category - Direct from payload
         category = request.get("category", "unknown")
-        products = request.get("products", [])
         
         print(f"📱 Platform: {platform}")
         print(f"📂 Category from payload: {category}")
-        print(f"📦 Products in payload: {len(products)}")
         
-        # ✅ STEP 2: Agar category "unknown" hai toh input se lein
+        # ✅ Agar category "unknown" hai toh input se lein
         if category == "unknown" or category == "":
             input_data = request.get("input", {})
             if isinstance(input_data, dict):
                 # Daraz
                 if input_data.get("category"):
                     category = input_data.get("category")
-                    print(f"📂 Category from input.category: {category}")
                 elif input_data.get("searchKeyword"):
                     category = input_data.get("searchKeyword")
-                    print(f"📂 Category from input.searchKeyword: {category}")
                 # Etsy
                 elif input_data.get("keyword"):
                     category = input_data.get("keyword")
-                    print(f"📂 Category from input.keyword: {category}")
+                print(f"📂 Category from input: {category}")
         
-        # ✅ STEP 3: Agar phir bhi unknown hai toh datasetId se fetch karein
-        if category == "unknown" or category == "":
-            dataset_id = request.get("datasetId")
-            if dataset_id:
-                try:
-                    import requests
-                    APIFY_TOKEN = os.getenv("APIFY_TOKEN", "apify_api_HlY6edMSwNJqptH4B2FWttNUIIbHKV0z1JTy")
-                    url = f"https://api.apify.com/v2/datasets/{dataset_id}/items?clean=true&token={APIFY_TOKEN}&limit=1"
-                    response = requests.get(url)
-                    if response.status_code == 200:
-                        items = response.json()
-                        if items and len(items) > 0:
-                            # Etsy: keyword from input
-                            if platform == "etsy":
-                                category = request.get("keyword", "etsy")
-                            else:
-                                category = "daraz_default"
-                            print(f"📂 Category from dataset fallback: {category}")
-                except Exception as e:
-                    print(f"⚠️ Could not fetch from dataset: {e}")
-        
-        # ✅ STEP 4: Final fallback
+        # ✅ Agar phir bhi unknown hai toh fallback
         if category == "unknown" or category == "":
             category = "wall_art" if platform == "etsy" else "earpods"
             print(f"📂 Using fallback category: {category}")
         
-        # ✅ STEP 5: Agar products nahi hain toh dataset se fetch karein
-        if not products or len(products) == 0:
+        # ✅ Products
+        products = request.get("products", [])
+        
+        if not products:
             dataset_id = request.get("datasetId")
             if dataset_id:
-                print(f"📥 No products in payload, fetching from dataset: {dataset_id}")
+                print(f"📥 Fetching from dataset: {dataset_id}")
                 background_tasks.add_task(fetch_apify_products, dataset_id, category, platform)
                 return {
                     "status": "success",
-                    "message": f"Fetching products from dataset {dataset_id} for {category}",
+                    "message": f"Fetching from dataset for {category}",
                     "category": category,
                     "platform": platform
                 }
             else:
-                return {
-                    "status": "warning",
-                    "message": "No products and no datasetId found",
-                    "category": category
-                }, 400
+                return {"status": "error", "message": "No products"}, 400
         
-        # ✅ STEP 6: Products hain toh save karein
-        print(f"💾 Saving {len(products)} products for {category} on {platform}")
-        
-        # ✅ Save CSV in background
+        print(f"💾 Saving {len(products)} products for {category}")
         background_tasks.add_task(save_apify_csv, products, category, platform)
         
         return {
             "status": "success",
             "message": f"Processing {len(products)} products for {category}",
             "category": category,
-            "platform": platform,
-            "products_count": len(products)
+            "platform": platform
         }
             
     except Exception as e:
         print(f"❌ Webhook error: {e}")
         traceback.print_exc()
-        return {"status": "error", "message": str(e)}, 500
-    
+        return {"status": "error", "message": str(e)}, 500 
 async def fetch_apify_products(dataset_id: str, category: str, platform: str):
     """Fetch products from Apify dataset"""
     try:

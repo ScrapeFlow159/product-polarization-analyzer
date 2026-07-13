@@ -24,42 +24,42 @@ app.post("/webhook/apify/daraz", async (req, res) => {
         console.log("🔥 DARAZ WEBHOOK RECEIVED");
         console.log("📦 Full Payload:", JSON.stringify(req.body, null, 2));
 
-        // ✅ STEP 1: Direct payload se category lein
-         let category = req.body.category || req.body.input?.category || req.body.input?.searchKeyword || "unknown";
-        console.log("📂 Category from payload:", category);
-
-        // ✅ STEP 2: Agar unknown hai toh input se lein
-        if (category === "unknown") {
+        // ✅ Category extract - Template variable handle karein
+        let category = req.body.category;
+        
+        // ✅ Agar category template variable hai ({{...}}) toh input se lein
+        if (!category || category.startsWith("{{")) {
             const inputData = req.body.input || {};
             category = inputData.category || inputData.searchKeyword || "unknown";
             console.log("📂 Category from input:", category);
         }
-
-        // ✅ STEP 3: Agar phir bhi unknown hai toh task se fetch karein (fallback)
-        if (category === "unknown") {
-            const { runId } = req.body;
-            if (runId) {
+        
+        // ✅ Agar phir bhi unknown hai toh ALL_INPUT se lein
+        if (!category || category === "unknown" || category.startsWith("{{")) {
+            const allInput = req.body.ALL_INPUT || {};
+            if (typeof allInput === "string") {
                 try {
-                    const runUrl = `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`;
-                    const runResponse = await axios.get(runUrl);
-                    const runData = runResponse.data.data;
-                    const taskId = runData.actorTaskId;
-                    
-                    if (taskId) {
-                        const taskUrl = `https://api.apify.com/v2/actor-tasks/${taskId}?token=${APIFY_TOKEN}`;
-                        const taskResponse = await axios.get(taskUrl);
-                        const taskInput = taskResponse.data.data.input;
-                        category = taskInput.category || taskInput.searchKeyword || "unknown";
-                        console.log("📂 Category from task:", category);
-                    }
-                } catch (err) {
-                    console.log("Could not fetch task details:", err.message);
+                    const parsed = JSON.parse(allInput);
+                    category = parsed.category || parsed.searchKeyword || "unknown";
+                } catch {
+                    category = "unknown";
                 }
+            } else {
+                category = allInput.category || allInput.searchKeyword || "unknown";
             }
+            console.log("📂 Category from ALL_INPUT:", category);
         }
 
+        // ✅ Final fallback
+        if (!category || category === "unknown" || category.startsWith("{{")) {
+            category = "earpods";
+            console.log("📂 Using fallback category:", category);
+        }
+
+        console.log(`📂 Final Category: ${category}`);
+
         const { datasetId } = req.body;
-        if (!datasetId) {
+        if (!datasetId || datasetId.startsWith("{{")) {
             return res.status(200).send("OK - no datasetId");
         }
 
@@ -73,25 +73,21 @@ app.post("/webhook/apify/daraz", async (req, res) => {
 
         console.log(`📦 Daraz: ${items.length} items for category: ${category}`);
 
-        const response = await axios.post(BACKEND_URL, {
+        await axios.post(BACKEND_URL, {
             category: category,
             products: items,
-            count: items.length,
-            platform: "daraz"
+            platform: "daraz",
+            input: req.body.input || {}
         }, { timeout: 60000 });
 
-        console.log(`✅ Daraz forwarded: ${response.status}`);
+        console.log(`✅ Daraz forwarded`);
         res.status(200).send("OK");
 
     } catch (error) {
         console.error("❌ Daraz WEBHOOK ERROR:", error.message);
-        if (error.response) {
-            console.error("   Backend response:", error.response.status, error.response.data);
-        }
         res.status(500).send("Error: " + error.message);
     }
 });
-
 // ============================================================
 // ETSY WEBHOOK
 // ============================================================
@@ -100,42 +96,42 @@ app.post("/webhook/apify/etsy", async (req, res) => {
         console.log("🔥 ETSY WEBHOOK RECEIVED");
         console.log("📦 Full Payload:", JSON.stringify(req.body, null, 2));
 
-        // ✅ STEP 1: Direct payload se category lein
-        let category = req.body.category || req.body.keyword || "unknown";
-        console.log("📂 Category from payload:", category);
-
-        // ✅ STEP 2: Agar unknown hai toh input se lein
-        if (category === "unknown") {
+        // ✅ Category extract - Template variable handle karein
+        let category = req.body.category || req.body.keyword;
+        
+        // ✅ Agar category template variable hai ({{...}}) toh input se lein
+        if (!category || category.startsWith("{{")) {
             const inputData = req.body.input || {};
             category = inputData.keyword || inputData.category || "unknown";
             console.log("📂 Category from input:", category);
         }
-
-        // ✅ STEP 3: Agar phir bhi unknown hai toh task se fetch karein (fallback)
-        if (category === "unknown") {
-            const { runId } = req.body;
-            if (runId) {
+        
+        // ✅ Agar phir bhi unknown hai toh ALL_INPUT se lein
+        if (!category || category === "unknown" || category.startsWith("{{")) {
+            const allInput = req.body.ALL_INPUT || {};
+            if (typeof allInput === "string") {
                 try {
-                    const runUrl = `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`;
-                    const runResponse = await axios.get(runUrl);
-                    const runData = runResponse.data.data;
-                    const taskId = runData.actorTaskId;
-                    
-                    if (taskId) {
-                        const taskUrl = `https://api.apify.com/v2/actor-tasks/${taskId}?token=${APIFY_TOKEN}`;
-                        const taskResponse = await axios.get(taskUrl);
-                        const taskInput = taskResponse.data.data.input;
-                        category = taskInput.keyword || taskInput.category || "unknown";
-                        console.log("📂 Category from task:", category);
-                    }
-                } catch (err) {
-                    console.log("Could not fetch task details:", err.message);
+                    const parsed = JSON.parse(allInput);
+                    category = parsed.keyword || parsed.category || "unknown";
+                } catch {
+                    category = "unknown";
                 }
+            } else {
+                category = allInput.keyword || allInput.category || "unknown";
             }
+            console.log("📂 Category from ALL_INPUT:", category);
         }
 
+        // ✅ Final fallback
+        if (!category || category === "unknown" || category.startsWith("{{")) {
+            category = "wall_art";
+            console.log("📂 Using fallback category:", category);
+        }
+
+        console.log(`📂 Final Category: ${category}`);
+
         const { datasetId } = req.body;
-        if (!datasetId) {
+        if (!datasetId || datasetId.startsWith("{{")) {
             return res.status(200).send("OK - no datasetId");
         }
 
@@ -149,21 +145,19 @@ app.post("/webhook/apify/etsy", async (req, res) => {
 
         console.log(`📦 Etsy: ${items.length} items for category: ${category}`);
 
-        const response = await axios.post(BACKEND_URL, {
+        await axios.post(BACKEND_URL, {
             category: category,
+            keyword: category,
             products: items,
-            count: items.length,
-            platform: "etsy"
+            platform: "etsy",
+            input: req.body.input || {}
         }, { timeout: 60000 });
 
-        console.log(`✅ Etsy forwarded: ${response.status}`);
+        console.log(`✅ Etsy forwarded`);
         res.status(200).send("OK");
 
     } catch (error) {
         console.error("❌ Etsy WEBHOOK ERROR:", error.message);
-        if (error.response) {
-            console.error("   Backend response:", error.response.status, error.response.data);
-        }
         res.status(500).send("Error: " + error.message);
     }
 });
