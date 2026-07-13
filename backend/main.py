@@ -1249,23 +1249,22 @@ async def save_apify_csv(products: list, category: str, platform: str):
         
         # ✅ Clean column names for Daraz/Etsy
         if platform.lower() == "daraz":
+            # ✅ Sirf missing fields rename karein
             if 'name' not in df.columns and 'title' in df.columns:
                 df.rename(columns={'title': 'name'}, inplace=True)
             if 'price' not in df.columns and 'product_price' in df.columns:
                 df.rename(columns={'product_price': 'price'}, inplace=True)
-            # ✅ ratingScore already hai, rename mat karo!
-            if 'ratingScore' not in df.columns and 'rating' in df.columns:
-                df.rename(columns={'rating': 'ratingScore'}, inplace=True)
-            if 'itemSold' not in df.columns and 'sold' in df.columns:
-                df.rename(columns={'sold': 'itemSold'}, inplace=True)
+            # ❌ ratingScore already hai, rename mat karo!
+            # ❌ itemSold already hai, rename mat karo!
+            
+            # ✅ DEBUG: Check columns
+            print(f"🔍 Daraz CSV columns: {df.columns.tolist()}")
+            if 'ratingScore' in df.columns:
+                print(f"   ratingScore sample: {df['ratingScore'].iloc[0] if len(df) > 0 else 'N/A'}")
+            if 'itemSold' in df.columns:
+                print(f"   itemSold sample: {df['itemSold'].iloc[0] if len(df) > 0 else 'N/A'}")
         
-        # ✅ Etsy: No column renaming needed - keep as-is
-        elif platform.lower() == "etsy":
-            # ✅ Agar name missing hai toh title se lein
-            if 'name' not in df.columns and 'title' in df.columns:
-                df.rename(columns={'title': 'name'}, inplace=True)
-        
-        # Save to CSV
+        # ✅ Save to CSV
         base_dir = os.path.dirname(os.path.abspath(__file__))
         data_dir = os.path.join(base_dir, "data")
         os.makedirs(data_dir, exist_ok=True)
@@ -1274,10 +1273,11 @@ async def save_apify_csv(products: list, category: str, platform: str):
         df.to_csv(csv_path, index=False)
         
         print(f"✅ CSV saved: {csv_path} ({len(df)} products)")
-
-        # ✅ Save raw data to database
+        
+        # ✅ ========== Save raw data to database ==========
         try:
             from database import save_raw_products
+            
             raw_products = df.to_dict('records')
             for p in raw_products:
                 if 'category' not in p or not p['category']:
@@ -1292,6 +1292,7 @@ async def save_apify_csv(products: list, category: str, platform: str):
             
         except Exception as e:
             print(f"⚠️ Warning: Could not save raw data: {e}")
+        # ========================================================
         
         # ✅ Reload in memory
         global DARAZ_DATASETS, ETSY_DATASETS
@@ -1370,55 +1371,57 @@ def extract_daraz_products(subcategory, limit=100):
     if not data:
         raise Exception(f"No data found for subcategory: {subcategory}")
     
-    # ✅ Debug: Pehle item ki keys dekhein
+    # ✅ DEBUG: Pehle item ki keys dekhein
     if data:
-        print(f"🔍 First Daraz item keys: {list(data[0].keys())}")
+        print(f"🔍 First item keys: {list(data[0].keys())}")
+        print(f"🔍 Sample item: {data[0]}")
     
     for idx, item in enumerate(data):
         if len(products) >= limit:
             break
         try:
-            # ✅ Name
             name = str(item.get('name', ''))
             if not name or len(name) < 3 or name == 'nan':
                 continue
             
-            # ✅ Price - try multiple sources
+            # ✅ Price
             price_str = str(item.get('price', '0'))
             price = clean_price(price_str, 'daraz')
             if price <= 0:
-                price_str = str(item.get('currentPrice', '0'))
-                price = clean_price(price_str, 'daraz')
-                if price <= 0:
-                    continue
+                continue
             
-            # ✅ Rating - try multiple sources
-            rating = float(item.get('ratingScore', 0))
-            if rating == 0:
+            # ✅ Rating - Direct extract
+            rating = 0.0
+            if 'ratingScore' in item:
+                rating = float(item.get('ratingScore', 0))
+                print(f"🔍 ratingScore found: {rating}")
+            elif 'rating' in item:
                 rating = float(item.get('rating', 0))
-            if rating == 0:
+                print(f"🔍 rating found: {rating}")
+            elif 'seller_rating' in item:
                 rating = float(item.get('seller_rating', 0))
-            rating = clean_rating(str(rating))
+                print(f"🔍 seller_rating found: {rating}")
             
-            # ✅ Reviews - try multiple sources
-            reviews = int(item.get('itemSold', 0))
-            if reviews == 0:
+            # ✅ Reviews - Direct extract
+            reviews = 0
+            if 'itemSold' in item:
+                reviews = int(item.get('itemSold', 0))
+                print(f"🔍 itemSold found: {reviews}")
+            elif 'sold' in item:
                 reviews = int(item.get('sold', 0))
-            if reviews == 0:
+                print(f"🔍 sold found: {reviews}")
+            elif 'reviewCount' in item:
                 reviews = int(item.get('reviewCount', 0))
-            reviews = clean_reviews(str(reviews))
+                print(f"🔍 reviewCount found: {reviews}")
             
-            # ✅ Seller
             seller = str(item.get('sellerName', 'Unknown Seller'))
             if seller == 'nan':
                 seller = 'Unknown Seller'
             
-            # ✅ Brand
             brand = str(item.get('brandName', 'No Brand'))
             if brand == 'nan':
                 brand = 'No Brand'
             
-            # ✅ Popularity
             popularity = min(1.0, reviews / 1000) if reviews > 0 else 0.1
             
             products.append({
