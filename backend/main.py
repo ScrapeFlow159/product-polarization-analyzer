@@ -1416,9 +1416,11 @@ def extract_daraz_products(subcategory, limit=100):
 import re
 
 def extract_etsy_products(subcategory, limit=40):
-    print("First item keys:", list(data[0].keys()) if data else None)
     products = []
-    data = ETSY_DATASETS.get(subcategory.lower())
+    data = ETSY_DATASETS.get(subcategory.lower())  # ✅ PEHLE data define karo
+    
+    print("First item keys:", list(data[0].keys()) if data else None)  # ✅ AB print karo
+    
     if not data:
         raise Exception(f"No Etsy data found for subcategory: {subcategory}")
 
@@ -1492,6 +1494,7 @@ def extract_etsy_products(subcategory, limit=40):
     
     print(f"✅ Successfully extracted {len(products)} products")
     return products
+
 def normalize_features(products, weights=None):
     if not products:
         return products
