@@ -25,7 +25,7 @@ app.post("/webhook/apify/daraz", async (req, res) => {
         console.log("📦 Full Payload:", JSON.stringify(req.body, null, 2));
 
         // ✅ STEP 1: Direct payload se category lein
-        let category = req.body.category || "unknown";
+         let category = req.body.category || req.body.input?.category || req.body.input?.searchKeyword || "unknown";
         console.log("📂 Category from payload:", category);
 
         // ✅ STEP 2: Agar unknown hai toh input se lein
