@@ -126,6 +126,75 @@ app.post("/webhook/apify/daraz", async (req, res) => {
 // ETSY WEBHOOK
 // ============================================================
 
+// ============================================================
+// ETSY CATEGORIES - 5 Dedicated Webhooks
+// ============================================================
+
+// 1. Custom Wooden Cake Topper
+app.post("/webhook/apify/etsy/custom-wooden-cake-topper", async (req, res) => {
+    await handleEtsyWebhook(req, res, "custom wooden cake topper");
+});
+
+// 2. Hand Stitched Leather Bookmark
+app.post("/webhook/apify/etsy/hand-stitched-leather-bookmark", async (req, res) => {
+    await handleEtsyWebhook(req, res, "hand stitched leather bookmark");
+});
+
+// 3. Personalized Brass Pet Tag
+app.post("/webhook/apify/etsy/personalized-brass-pet-tag", async (req, res) => {
+    await handleEtsyWebhook(req, res, "personalized brass pet tag");
+});
+
+// 4. Custom Embroidered Baby Onesie
+app.post("/webhook/apify/etsy/custom-embroidered-baby-onesie", async (req, res) => {
+    await handleEtsyWebhook(req, res, "custom embroidered baby onesie");
+});
+
+// 5. Personalized Wax Seal Stamp
+app.post("/webhook/apify/etsy/personalized-wax-seal-stamp", async (req, res) => {
+    await handleEtsyWebhook(req, res, "personalized wax seal stamp");
+});
+
+// ============================================================
+// COMMON HANDLER FUNCTION
+// ============================================================
+
+async function handleEtsyWebhook(req, res, category) {
+    try {
+        console.log(`🔥 ETSY WEBHOOK RECEIVED for: ${category}`);
+        console.log("📦 Full Payload:", JSON.stringify(req.body, null, 2));
+
+        const { datasetId } = req.body;
+        if (!datasetId) {
+            return res.status(200).send("OK - no datasetId");
+        }
+
+        const url = `https://api.apify.com/v2/datasets/${datasetId}/items?clean=true&token=${APIFY_TOKEN}`;
+        const { data: items } = await axios.get(url);
+
+        if (!items || items.length === 0) {
+            console.log("No items found");
+            return res.status(200).send("No items found");
+        }
+
+        console.log(`📦 Etsy: ${items.length} items for category: ${category}`);
+
+        await axios.post(BACKEND_URL, {
+            category: category,
+            keyword: category,
+            products: items,
+            platform: "etsy"
+        }, { timeout: 60000 });
+
+        console.log(`✅ Etsy forwarded for: ${category}`);
+        res.status(200).send("OK");
+
+    } catch (error) {
+        console.error(`❌ Etsy WEBHOOK ERROR (${category}):`, error.message);
+        res.status(500).send("Error: " + error.message);
+    }
+}
+
 
 app.post("/webhook/apify/etsy", async (req, res) => {
     try {
