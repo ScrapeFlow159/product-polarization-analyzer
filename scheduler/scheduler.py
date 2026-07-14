@@ -14,7 +14,13 @@ API_BASE_URL = os.getenv("API_BASE_URL", "https://your-main-app.up.railway.app")
 
 PLATFORMS = {
     "daraz": ["earpods", "powerbanks", "gaming_accessories", "mobile_phone_accessories", "smart_watches"],
-    "etsy": ["wall_art", "handmade_gifts", "jewelry", "vintage", "accessories"]
+    "etsy": [
+        "custom wooden cake topper",
+        "hand stitched leather bookmark", 
+        "personalized brass pet tag",
+        "custom embroidered baby onesie",
+        "personalized wax seal stamp"
+    ]
 }
 
 def run_daily_analysis():
