@@ -1058,7 +1058,24 @@ def load_csv_data():
     print("\n✅ CSV files loaded successfully!")
     print("="*60)
 
-
+@app.post("/api/analyze-public")
+async def analyze_public(request: AnalysisRequest):
+    """
+    Public endpoint for scheduler - NO AUTH REQUIRED
+    """
+    try:
+        print(f"🔍 Public Analysis: {request.platform} - {request.subcategory}")
+        
+        # ✅ Direct call with dummy auth
+        return await analyze_polarization(
+            request, 
+            auth_data={"username": "scheduler", "role": "Admin"}
+        )
+        
+    except Exception as e:
+        print(f"❌ Public analysis error: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 @app.post("/api/apify-webhook")
 async def apify_webhook(request: dict, background_tasks: BackgroundTasks):
     """
