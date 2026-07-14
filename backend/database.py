@@ -150,52 +150,95 @@ def init_etsy_raw_table():
     except Exception as e:
         print(f"❌ Error: {e}")
 def save_daraz_raw_products(category, products):
-    """Save Daraz products to daraz_raw_products table"""
+    """Save Daraz products to daraz_raw_products table - Safe version"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         scraped_date = datetime.now().date()
         saved_count = 0
+        skipped = 0
         
         for p in products:
-            # ✅ Daraz specific fields
-            product_name = str(p.get('name', ''))[:200]
-            price = float(p.get('price', 0))
-            rating = float(p.get('ratingScore', p.get('rating', 0)))
-            reviews = int(p.get('itemSold', p.get('reviews', 0)))
-            seller = str(p.get('sellerName', ''))[:50]
-            brand = str(p.get('brandName', 'No Brand'))[:30]
-            product_url = str(p.get('itemUrl', ''))[:200]
-            
-            cursor.execute('''
-                INSERT INTO daraz_raw_products 
-                (category, product_name, price, rating, reviews, popularity, 
-                 seller, brand, product_url, scraped_date)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                category,
-                product_name,
-                price,
-                rating,
-                reviews,
-                0.0,  # popularity (calculate later)
-                seller,
-                brand,
-                product_url,
-                scraped_date
-            ))
-            saved_count += 1
+            try:
+                # Product Name
+                product_name = str(p.get('name', '') or p.get('title', ''))[:200]
+                if not product_name or len(product_name.strip()) < 3:
+                    skipped += 1
+                    continue
+
+                # Price - Safe
+                price = 0.0
+                price_val = p.get('price')
+                if price_val is not None:
+                    try:
+                        price = float(str(price_val).replace(',', '').strip())
+                    except:
+                        price = 0.0
+
+                # Rating - Safe handling (yeh error aa raha tha)
+                rating = 0.0
+                rating_score = p.get('ratingScore')
+                rating_direct = p.get('rating')
+                
+                if rating_score is not None:
+                    try:
+                        rating = float(rating_score)
+                    except:
+                        rating = 0.0
+                elif rating_direct is not None:
+                    try:
+                        rating = float(rating_direct)
+                    except:
+                        rating = 0.0
+
+                # Reviews - Safe
+                reviews = 0
+                for key in ['itemSold', 'sold', 'reviews', 'reviewCount', 'review_count']:
+                    val = p.get(key)
+                    if val is not None:
+                        try:
+                            reviews = int(float(val))
+                            break
+                        except:
+                            continue
+
+                seller = str(p.get('sellerName', 'Unknown Seller'))[:50]
+                brand = str(p.get('brandName', 'No Brand'))[:30]
+                product_url = str(p.get('itemUrl', '') or p.get('url', ''))[:200]
+
+                cursor.execute('''
+                    INSERT INTO daraz_raw_products 
+                    (category, product_name, price, rating, reviews, popularity, 
+                     seller, brand, product_url, scraped_date)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    category,
+                    product_name,
+                    price,
+                    rating,
+                    reviews,
+                    0.0,
+                    seller,
+                    brand,
+                    product_url,
+                    scraped_date
+                ))
+                saved_count += 1
+                
+            except Exception as item_error:
+                skipped += 1
+                continue  # Ek item fail hone se baqi nahi rukenge
         
         conn.commit()
         conn.close()
-        print(f"✅ Saved {saved_count} Daraz products for {category}")
+        
+        print(f"✅ Saved {saved_count} Daraz products for {category} (Skipped: {skipped})")
         return True
+        
     except Exception as e:
         print(f"❌ Error saving Daraz products: {e}")
         traceback.print_exc()
         return False
-
-
 def save_etsy_raw_products(category, products):
     """Save Etsy products to etsy_raw_products table"""
     try:
