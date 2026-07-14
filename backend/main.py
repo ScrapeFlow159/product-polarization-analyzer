@@ -1077,63 +1077,52 @@ async def analyze_public(request: AnalysisRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 @app.post("/api/apify-webhook")
-async def apify_webhook(request: dict, background_tasks: BackgroundTasks):
+async def apify_webhook(request: Request, background_tasks: BackgroundTasks):
     """
-    Apify webhook handler - receives data from webhook service and saves CSV
+    Apify webhook handler - CSV + Raw Database Tables dono save karega
     """
     try:
+        data = await request.json()
+        
         print("\n" + "="*60)
         print("🔥 WEBHOOK RECEIVED")
         print("="*60)
-        print(f"📦 Full Payload: {json.dumps(request, indent=2)}")
         
-        # ✅ Platform
-        platform = request.get("platform", "daraz")
-        
-        # ✅ Category - Direct from payload
-        category = request.get("category", "unknown")
+        platform = data.get("platform", "daraz").lower()
+        category = data.get("category") or data.get("keyword") or "unknown"
+        products = data.get("products", [])
         
         print(f"📱 Platform: {platform}")
-        print(f"📂 Category from payload: {category}")
+        print(f"📂 Category: {category}")
+        print(f"📦 Products Received: {len(products)}")
         
-        # ✅ Agar category "unknown" hai toh input se lein
-        if category == "unknown" or category == "":
-            input_data = request.get("input", {})
+        # Category fallback logic
+        if category in ["unknown", "", None]:
+            input_data = data.get("input", {})
             if isinstance(input_data, dict):
-                # Daraz
-                if input_data.get("category"):
-                    category = input_data.get("category")
-                elif input_data.get("searchKeyword"):
-                    category = input_data.get("searchKeyword")
-                # Etsy
-                elif input_data.get("keyword"):
-                    category = input_data.get("keyword")
-                print(f"📂 Category from input: {category}")
+                category = (input_data.get("category") or 
+                           input_data.get("searchKeyword") or 
+                           input_data.get("keyword") or 
+                           "unknown")
         
-        # ✅ Agar phir bhi unknown hai toh fallback
-        if category == "unknown" or category == "":
-            category = "wall_art" if platform == "etsy" else "earpods"
+        if category in ["unknown", "", None]:
+            category = "earpods" if platform == "daraz" else "wall_art"
             print(f"📂 Using fallback category: {category}")
         
-        # ✅ Products
-        products = request.get("products", [])
-        
         if not products:
-            dataset_id = request.get("datasetId")
-            if dataset_id:
-                print(f"📥 Fetching from dataset: {dataset_id}")
-                background_tasks.add_task(fetch_apify_products, dataset_id, category, platform)
-                return {
-                    "status": "success",
-                    "message": f"Fetching from dataset for {category}",
-                    "category": category,
-                    "platform": platform
-                }
-            else:
-                return {"status": "error", "message": "No products"}, 400
+            print("⚠️ No products in payload")
+            return {"status": "error", "message": "No products received"}, 400
         
-        print(f"💾 Saving {len(products)} products for {category}")
+        # === BACKGROUND TASKS ===
         background_tasks.add_task(save_apify_csv, products, category, platform)
+        
+        # Raw Database Tables mein save
+        if platform == "daraz":
+            background_tasks.add_task(save_daraz_raw_products_task, category, products)
+        elif platform == "etsy":
+            background_tasks.add_task(save_etsy_raw_products_task, category, products)
+        
+        print(f"✅ Webhook processing started for {platform}/{category}")
         
         return {
             "status": "success",
@@ -1145,7 +1134,33 @@ async def apify_webhook(request: dict, background_tasks: BackgroundTasks):
     except Exception as e:
         print(f"❌ Webhook error: {e}")
         traceback.print_exc()
-        return {"status": "error", "message": str(e)}, 500 
+        return {"status": "error", "message": str(e)}, 500
+
+
+# Helper functions for background tasks
+async def save_daraz_raw_products_task(category: str, products: list):
+    try:
+        from database import save_daraz_raw_products
+        success = save_daraz_raw_products(category, products)
+        if success:
+            print(f"✅ Daraz raw data saved in database for {category}")
+        else:
+            print(f"❌ Failed to save Daraz raw data for {category}")
+    except Exception as e:
+        print(f"❌ Daraz raw save error: {e}")
+
+
+async def save_etsy_raw_products_task(category: str, products: list):
+    try:
+        from database import save_etsy_raw_products
+        success = save_etsy_raw_products(category, products)
+        if success:
+            print(f"✅ Etsy raw data saved in database for {category}")
+        else:
+            print(f"❌ Failed to save Etsy raw data for {category}")
+    except Exception as e:
+        print(f"❌ Etsy raw save error: {e}")
+
 async def fetch_apify_products(dataset_id: str, category: str, platform: str):
     """Fetch products from Apify dataset"""
     try:
