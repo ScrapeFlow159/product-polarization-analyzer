@@ -5,10 +5,12 @@ import json
 import urllib.request
 import urllib.error
 import logging
+import time
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-API_BASE_URL = os.getenv("API_BASE_URL", "https://product-polarization-analyzer-production.up.railway.app")
+# Railway Environment Variable se URL lo
+API_BASE_URL = os.getenv("API_BASE_URL", "https://your-main-app.up.railway.app")
 
 PLATFORMS = {
     "daraz": ["earpods", "powerbanks", "gaming_accessories", "mobile_phone_accessories", "smart_watches"],
@@ -16,8 +18,7 @@ PLATFORMS = {
 }
 
 def run_daily_analysis():
-    """Daily analysis using urllib (no requests package needed)"""
-    
+    """Daily analysis for all categories"""
     logging.info(f"🚀 Daily Analysis Started at {datetime.now()}")
     success, failed = 0, 0
     
@@ -42,42 +43,47 @@ def run_daily_analysis():
                 req = urllib.request.Request(
                     url,
                     data=data,
-                    headers={
-                        'Content-Type': 'application/json',
-                        'Content-Length': str(len(data))
-                    },
+                    headers={'Content-Type': 'application/json'},
                     method='POST'
                 )
                 
-                with urllib.request.urlopen(req, timeout=120) as response:
+                with urllib.request.urlopen(req, timeout=180) as response:
                     if response.status == 200:
                         result = json.loads(response.read().decode())
                         score = result.get('polarization_score', 'N/A')
-                        logging.info(f"✅ {platform}/{category} - Score: {score}")
+                        logging.info(f"✅ SUCCESS {platform}/{category} → Score: {score}")
                         success += 1
                     else:
-                        logging.error(f"❌ {platform}/{category} - Failed: {response.status}")
+                        logging.error(f"❌ FAILED {platform}/{category} → Status: {response.status}")
                         failed += 1
                         
-            except urllib.error.URLError as e:
-                logging.error(f"❌ {platform}/{category} - URL Error: {e.reason}")
-                failed += 1
             except Exception as e:
-                logging.error(f"❌ {platform}/{category} - Error: {e}")
+                logging.error(f"❌ ERROR {platform}/{category} → {str(e)}")
                 failed += 1
     
-    logging.info(f"📊 Complete - Success: {success}, Failed: {failed}")
+    logging.info(f"📊 Daily Analysis Completed → Success: {success} | Failed: {failed}")
+
 
 def start_scheduler():
     scheduler = BackgroundScheduler()
     scheduler.add_job(
-        run_daily_analysis, 
-        'cron', 
-        hour=2, 
-        minute=0, 
-        id='daily_analysis', 
+        run_daily_analysis,
+        'cron',
+        hour=2, minute=0,   # Raat 2 baje
+        id='daily_analysis',
         replace_existing=True
     )
     scheduler.start()
-    logging.info("✅ Daily Scheduler Started - 2:00 AM Daily")
+    logging.info("✅ Scheduler Started Successfully - Daily at 2:00 AM")
     return scheduler
+
+
+# Direct run karne ke liye (Railway ke liye zaroori)
+if __name__ == "__main__":
+    scheduler = start_scheduler()
+    print("🟢 Scheduler is running... (Press Ctrl+C to stop)")
+    try:
+        while True:
+            time.sleep(60)
+    except KeyboardInterrupt:
+        print("⛔ Shutting down scheduler...")

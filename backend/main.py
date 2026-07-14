@@ -1912,12 +1912,12 @@ async def collect_weekly_data(background_tasks: BackgroundTasks):
     background_tasks.add_task(scheduler.collect_weekly_data)
     return {"message": "Weekly data collection started in background"}
 # ✅ Start scheduler (NON-BLOCKING)
-try:
-    from scheduler import start_scheduler
-    scheduler = start_scheduler()
-    print("✅ Scheduler started in background")
-except Exception as e:
-    print(f"⚠️ Scheduler error: {e}")
+#try:
+ #   from scheduler import start_scheduler
+ #   scheduler = start_scheduler()
+  #  print("✅ Scheduler started in background")
+#except Exception as e:
+ #   print(f"⚠️ Scheduler error: {e}")
 if __name__ == "__main__":
    
     print("\n" + "="*60)
