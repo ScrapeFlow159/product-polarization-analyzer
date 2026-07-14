@@ -1095,6 +1095,22 @@ async def apify_webhook(request: Request, background_tasks: BackgroundTasks):
         print(f"📱 Platform: {platform}")
         print(f"📂 Category: {category}")
         print(f"📦 Products Received: {len(products)}")
+        category = None
+        # Source 1: Direct category field
+        category = data.get("category") or data.get("keyword") or data.get("searchKeyword")
+
+        # Source 2: listingUrls se extract (Sabse Reliable for Etsy)
+        if not category and data.get("listingUrls"):
+            try:
+                url = data["listingUrls"][0].get("url", "")
+                if "q=" in url:
+                    # URL se category nikaalo
+                    query_part = url.split("q=")[1].split("&")[0]
+                    category = query_part.replace("+", " ").strip()
+                    print(f"✅ Category extracted from URL: {category}")
+            except:
+                pass
+        
         
         # Category fallback logic
         if category in ["unknown", "", None]:
