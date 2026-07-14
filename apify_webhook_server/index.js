@@ -24,42 +24,76 @@ app.post("/webhook/apify/daraz", async (req, res) => {
         console.log("🔥 DARAZ WEBHOOK RECEIVED");
         console.log("📦 Full Payload:", JSON.stringify(req.body, null, 2));
 
-        // ✅ Category extract - Template variable handle karein
-        let category = req.body.category;
-        
-        // ✅ Agar category template variable hai ({{...}}) toh input se lein
-        if (!category || category.startsWith("{{")) {
-            const inputData = req.body.input || {};
-            category = inputData.category || inputData.searchKeyword || "unknown";
-            console.log("📂 Category from input:", category);
-        }
-        
-        // ✅ Agar phir bhi unknown hai toh ALL_INPUT se lein
-        if (!category || category === "unknown" || category.startsWith("{{")) {
-            const allInput = req.body.ALL_INPUT || {};
-            if (typeof allInput === "string") {
-                try {
-                    const parsed = JSON.parse(allInput);
-                    category = parsed.category || parsed.searchKeyword || "unknown";
-                } catch {
-                    category = "unknown";
+        let category = null;
+
+        // ✅ SOURCE 1: Task se fetch karein
+        const { runId, datasetId } = req.body;
+
+        if (runId) {
+            try {
+                console.log(`📥 Fetching task details for runId: ${runId}`);
+                const runUrl = `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`;
+                const runResponse = await axios.get(runUrl);
+                const runData = runResponse.data.data;
+                const taskId = runData.actorTaskId;
+
+                if (taskId) {
+                    const taskUrl = `https://api.apify.com/v2/actor-tasks/${taskId}?token=${APIFY_TOKEN}`;
+                    const taskResponse = await axios.get(taskUrl);
+                    const taskInput = taskResponse.data.data.input;
+
+                    category = taskInput.category || 
+                              taskInput.search_keyword || 
+                              taskInput.searchKeyword || 
+                              null;
+                    console.log("📂 Category from task:", category);
                 }
-            } else {
-                category = allInput.category || allInput.searchKeyword || "unknown";
+            } catch (err) {
+                console.log("⚠️ Could not fetch task:", err.message);
             }
-            console.log("📂 Category from ALL_INPUT:", category);
         }
 
-        // ✅ Final fallback
-        if (!category || category === "unknown" || category.startsWith("{{")) {
-            category = "earpods";
+        // ✅ SOURCE 2: Agar task se nahi mila toh input se lein
+        if (!category) {
+            const inputData = req.body.input || {};
+            category = inputData.category || 
+                      inputData.search_keyword || 
+                      inputData.searchKeyword || 
+                      null;
+            console.log("📂 Category from input:", category);
+        }
+
+        // ✅ SOURCE 3: Agar phir bhi nahi mila toh products se searchKeyword lein (SAB SE BEST!)
+        if (!category) {
+            const { datasetId } = req.body;
+            if (datasetId) {
+                try {
+                    const url = `https://api.apify.com/v2/datasets/${datasetId}/items?clean=true&token=${APIFY_TOKEN}&limit=1`;
+                    const response = await axios.get(url);
+                    const items = response.data;
+                    
+                    if (items && items.length > 0) {
+                        // ✅ Pehle product se searchKeyword lein
+                        category = items[0].searchKeyword || 
+                                  items[0].search_keyword || 
+                                  null;
+                        console.log("📂 Category from product searchKeyword:", category);
+                    }
+                } catch (err) {
+                    console.log("⚠️ Could not fetch product:", err.message);
+                }
+            }
+        }
+
+        // ✅ SOURCE 4: FINAL FALLBACK
+        if (!category) {
+            category = "powerbanks";  // Default
             console.log("📂 Using fallback category:", category);
         }
 
-        console.log(`📂 Final Category: ${category}`);
+        console.log(`📂 FINAL Category: ${category}`);
 
-        const { datasetId } = req.body;
-        if (!datasetId || datasetId.startsWith("{{")) {
+        if (!datasetId) {
             return res.status(200).send("OK - no datasetId");
         }
 

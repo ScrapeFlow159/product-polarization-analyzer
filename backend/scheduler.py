@@ -1,3 +1,4 @@
+import requests
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
 import os
