@@ -26,7 +26,7 @@ from database import (
     save_daily_snapshot, get_daily_snapshots, get_weekly_snapshots ,
     get_system_settings, save_system_settings 
 )
-from scheduler import start_scheduler
+#from scheduler import start_scheduler
 from fastapi import HTTPException, Request
 from fastapi.responses import RedirectResponse
 import sqlite3
@@ -1227,7 +1227,7 @@ migrate_database()
 
 
 # Start the background scheduler
-start_scheduler()
+#start_scheduler()
 
 
 # Helper functions for data cleaning
@@ -1905,12 +1905,12 @@ async def get_historical(platform: str, category: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/collect-weekly")
-async def collect_weekly_data(background_tasks: BackgroundTasks):
-    """Manually trigger weekly data collection"""
-    from scheduler import scheduler
-    background_tasks.add_task(scheduler.collect_weekly_data)
-    return {"message": "Weekly data collection started in background"}
+#@app.post("/api/collect-weekly")
+#async def collect_weekly_data(background_tasks: BackgroundTasks):
+ #   """Manually trigger weekly data collection"""
+   # from scheduler import scheduler
+ #   background_tasks.add_task(scheduler.collect_weekly_data)
+  #  return {"message": "Weekly data collection started in background"}
 # ✅ Start scheduler (NON-BLOCKING)
 #try:
  #   from scheduler import start_scheduler
