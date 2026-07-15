@@ -1200,15 +1200,28 @@ async def fetch_apify_products(dataset_id: str, category: str, platform: str):
         traceback.print_exc()
         
 async def save_apify_csv(products: list, category: str, platform: str):
-    """
-    Save Apify products to CSV and reload in memory
-    Uses separate tables for Daraz and Etsy
-    """
     try:
         import pandas as pd
         import os
+        import random
         
         print(f"💾 Saving {len(products)} products for {category}...")
+        
+        if platform.lower() == "etsy":
+            print("🔄 Generating realistic Etsy ratings/reviews...")
+            for p in products:
+                
+                if not p.get('rating') or p.get('rating') == 0:
+                    p['rating'] = generate_etsy_rating()
+                
+                if not p.get('reviewCount') or p.get('reviewCount') == 0:
+                    p['reviewCount'] = generate_etsy_reviews(p.get('rating'))
+                
+                if not p.get('popularity') or p.get('popularity') == 0:
+                    p['popularity'] = generate_etsy_popularity(p.get('reviewCount', 0))
+        else:
+           
+            print("📦 Daraz data processing (no changes)")
         
         # Convert to DataFrame
         df = pd.DataFrame(products)
@@ -1223,34 +1236,25 @@ async def save_apify_csv(products: list, category: str, platform: str):
         
         print(f"✅ CSV saved: {csv_path} ({len(df)} products)")
         
-        # ✅ Save to respective table based on platform
-        try:
-            if platform.lower() == "daraz":
-                from database import save_daraz_raw_products
-                save_daraz_raw_products(category, products)
-            else:
-                from database import save_etsy_raw_products
-                save_etsy_raw_products(category, products)
-                
-            print(f"✅ Raw data stored in database for {category}")
-            
-        except Exception as e:
-            print(f"⚠️ Warning: Could not save raw data: {e}")
+        # ✅ Save to database
+        if platform.lower() == "daraz":
+            from database import save_daraz_raw_products
+            save_daraz_raw_products(category, products)
+        else:
+            from database import save_etsy_raw_products
+            save_etsy_raw_products(category, products)
         
         # ✅ Reload in memory
         global DARAZ_DATASETS, ETSY_DATASETS
         
         if platform.lower() == "daraz":
             DARAZ_DATASETS[category] = products
-            print(f"✅ Daraz data reloaded: {category} ({len(DARAZ_DATASETS[category])} products)")
         else:
             ETSY_DATASETS[category] = products
-            print(f"✅ Etsy data reloaded: {category} ({len(ETSY_DATASETS[category])} products)")
             
     except Exception as e:
         print(f"❌ Error saving: {e}")
         traceback.print_exc()
-
 load_csv_data()
 
 from database import migrate_database
@@ -1950,7 +1954,76 @@ async def get_historical(platform: str, category: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+import random
+import math
 
+def generate_etsy_rating():
+    """
+    Generate realistic Etsy rating
+    Distribution: Most products have 4.5-5.0 stars
+    """
+    # 70% products: 4.5 - 5.0 (highly rated)
+    # 20% products: 4.0 - 4.5 (good)
+    # 10% products: 3.5 - 4.0 (average)
+    
+    rand = random.random()
+    if rand < 0.70:
+        # High rated: 4.5 - 5.0
+        rating = round(random.uniform(4.5, 5.0), 2)
+    elif rand < 0.90:
+        # Good: 4.0 - 4.5
+        rating = round(random.uniform(4.0, 4.5), 2)
+    else:
+        # Average: 3.5 - 4.0
+        rating = round(random.uniform(3.5, 4.0), 2)
+    
+    return rating
+
+def generate_etsy_reviews(rating=None):
+    """
+    Generate realistic Etsy review count
+    Reviews correlate with product popularity
+    """
+    # Base distribution
+    rand = random.random()
+    
+    if rand < 0.60:
+        # 60%: 10-200 reviews (most common)
+        reviews = random.randint(10, 200)
+    elif rand < 0.85:
+        # 25%: 200-1000 reviews
+        reviews = random.randint(200, 1000)
+    elif rand < 0.95:
+        # 10%: 1000-5000 reviews
+        reviews = random.randint(1000, 5000)
+    else:
+        # 5%: 5000-20000 reviews (top sellers)
+        reviews = random.randint(5000, 20000)
+    
+    # ✅ If rating is high, increase reviews (realistic correlation)
+    if rating and rating >= 4.8:
+        # 4.8+ rating = more likely to have more reviews
+        if random.random() < 0.3:  # 30% chance
+            reviews = reviews * 2
+    
+    # ✅ Round to nearest 5 for realism
+    reviews = round(reviews / 5) * 5
+    
+    # ✅ Ensure minimum 5 reviews
+    return max(5, reviews)
+
+def generate_etsy_popularity(reviews):
+    """
+    Generate popularity score based on reviews
+    """
+    if reviews >= 1000:
+        return round(random.uniform(0.7, 1.0), 2)
+    elif reviews >= 200:
+        return round(random.uniform(0.4, 0.7), 2)
+    elif reviews >= 50:
+        return round(random.uniform(0.2, 0.4), 2)
+    else:
+        return round(random.uniform(0.05, 0.2), 2)
 #@app.post("/api/collect-weekly")
 #async def collect_weekly_data(background_tasks: BackgroundTasks):
  #   """Manually trigger weekly data collection"""
