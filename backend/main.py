@@ -1019,65 +1019,49 @@ def get_db_connection():
     return conn
 
 def load_csv_data():
-    """Load data from CSV files"""
+    """Load data from CSV files - DYNAMIC"""
     global DARAZ_DATASETS, ETSY_DATASETS, CSV_FILES_FOUND
     
     print("\n📂 LOADING CSV DATA...")
     
     base_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(base_dir, "data")
     
-    daraz_files = {
-        "earpods": [os.path.join(base_dir, "earpods.csv"), os.path.join(base_dir, "data", "earpods.csv"), "earpods.csv"],
-        "powerbanks": [os.path.join(base_dir, "powerbanks.csv"), os.path.join(base_dir, "data", "powerbanks.csv"), "powerbanks.csv"],
-        "gaming_accessories": [os.path.join(base_dir, "gaming_accessories.csv"), os.path.join(base_dir, "data", "gaming_accessories.csv"), "gaming_accessories.csv"],
-        "mobile_phone_accessories": [os.path.join(base_dir, "mobile_phone_accessories.csv"), os.path.join(base_dir, "data", "mobile_phone_accessories.csv"), "mobile_phone_accessories.csv"],
-        "smart_watches": [os.path.join(base_dir, "smart_watches.csv"), os.path.join(base_dir, "data", "smart_watches.csv"), "smart_watches.csv"]
-    }
-
-    for category, paths in daraz_files.items():
-        for path in paths:
-            if os.path.exists(path):
+    # ✅ Agar data folder exists toh saari CSV files load karein
+    if os.path.exists(data_dir):
+        print(f"📁 Loading all CSV files from: {data_dir}")
+        
+        for file in os.listdir(data_dir):
+            if file.endswith('.csv'):
+                category_name = file.replace('.csv', '')
+                file_path = os.path.join(data_dir, file)
+                
                 try:
-                    print(f"📖 Reading Daraz {category} CSV from: {path}")
-                    df = pd.read_csv(path, encoding='utf-8')
+                    print(f"📖 Reading: {file}")
+                    df = pd.read_csv(file_path, encoding='utf-8')
                     df = df.dropna(how='all')
                     df = df.fillna('')
-                    DARAZ_DATASETS[category] = df.to_dict('records')
-                    CSV_FILES_FOUND[f"daraz_{category}"] = True
-                    CSV_FILES_FOUND["daraz"] = True
-                    print(f"✅ Loaded {len(DARAZ_DATASETS[category])} {category} products")
-                    break
+                    
+                    # ✅ Daraz ya Etsy? Platform detect karein
+                    # Agar category Daraz ki list mein hai toh Daraz mein daalein
+                    if category_name in ["earpods", "powerbanks", "gaming_accessories", 
+                                        "mobile_phone_accessories", "smart_watches"]:
+                        DARAZ_DATASETS[category_name] = df.to_dict('records')
+                        CSV_FILES_FOUND[f"daraz_{category_name}"] = True
+                        print(f"   ✅ Daraz: {category_name} ({len(df)} products)")
+                    else:
+                        # ✅ Etsy category (nayi aur purani sab)
+                        ETSY_DATASETS[category_name] = df.to_dict('records')
+                        CSV_FILES_FOUND[f"etsy_{category_name}"] = True
+                        print(f"   ✅ Etsy: {category_name} ({len(df)} products)")
+                        
                 except Exception as e:
-                    print(f"❌ Failed to load {path}: {str(e)}")
-                    continue
-
-    etsy_files = {
-        "art": [os.path.join(base_dir, "art.csv"), os.path.join(base_dir, "data", "art.csv"), "art.csv"],
-        "handmade": [os.path.join(base_dir, "handmade.csv"), os.path.join(base_dir, "data", "handmade.csv"), "handmade.csv"],
-        "jewelry": [os.path.join(base_dir, "jewelry.csv"), os.path.join(base_dir, "data", "jewelry.csv"), "jewelry.csv"],
-        "vintage": [os.path.join(base_dir, "vintage.csv"), os.path.join(base_dir, "data", "vintage.csv"), "vintage.csv"],
-        "accessories": [os.path.join(base_dir, "accessories.csv"), os.path.join(base_dir, "data", "accessories.csv"), "accessories.csv"]
-    }
-
-    for category, paths in etsy_files.items():
-        for path in paths:
-            if os.path.exists(path):
-                try:
-                    print(f"📖 Reading Etsy {category} CSV from: {path}")
-                    df = pd.read_csv(path, encoding='utf-8')
-                    df = df.dropna(how='all')
-                    df = df.fillna('')
-                    ETSY_DATASETS[category] = df.to_dict('records')
-                    CSV_FILES_FOUND[f"etsy_{category}"] = True
-                    CSV_FILES_FOUND["etsy"] = True
-                    print(f"✅ Loaded {len(ETSY_DATASETS[category])} {category} products")
-                    break
-                except Exception as e:
-                    print(f"❌ Failed to load {path}: {str(e)}")
-
+                    print(f"   ❌ Failed to load {file}: {str(e)}")
+    else:
+        print("⚠️ data directory not found!")
+    
     print("\n✅ CSV files loaded successfully!")
     print("="*60)
-
 @app.post("/api/analyze-public")
 async def analyze_public(request: AnalysisRequest):
     """
