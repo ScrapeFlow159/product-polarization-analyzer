@@ -1626,7 +1626,14 @@ function closeModal() {
             dropdownContent.innerHTML = '';
             
             categories.forEach(cat => {
-                const categoryId = cat.toLowerCase().replace(/ /g, '_');
+                let categoryId;
+                 if (state.platform === 'etsy') {
+    // Etsy: Space wali ID (underscore nahi)
+                     categoryId = cat.toLowerCase();
+                   } else {
+    // Daraz: Underscore wali ID (same as before)
+                     categoryId = cat.toLowerCase().replace(/ /g, '_');
+                      }
                 const isSelected = state.selected.includes(categoryId);
                 const isDisabled = !isSelected && state.selected.length >= 3;
                 

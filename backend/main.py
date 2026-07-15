@@ -1385,12 +1385,27 @@ def extract_daraz_products(subcategory, limit=100):
     return products
 import re
 
-def extract_etsy_products(subcategory, limit=40):
+def extract_etsy_products(subcategory, limit=100):
     products = []
     data = ETSY_DATASETS.get(subcategory.lower())
     
+    original_subcategory = subcategory
+    
+    # ✅ Underscore ko space mein convert karein (sirf Etsy ke liye)
+    subcategory = subcategory.replace("_", " ")
+    
+    # ✅ Pehle space wali try karein
+    data = ETSY_DATASETS.get(subcategory.lower())
+    
+    # ✅ Agar nahi mili toh underscore wali try karein (fallback)
     if not data:
-        raise Exception(f"No Etsy data found for subcategory: {subcategory}")
+        fallback_category = original_subcategory.replace(" ", "_")
+        data = ETSY_DATASETS.get(fallback_category)
+        if data:
+            print(f"✅ Found {fallback_category} as fallback for {subcategory}")
+    
+    if not data:
+        raise Exception(f"No data found for subcategory: {subcategory}")
 
     # ✅ Debug: Pehle item ki keys dekhein
     if data:
