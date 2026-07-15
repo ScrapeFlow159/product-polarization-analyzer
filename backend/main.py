@@ -1391,30 +1391,33 @@ import re
 
 def extract_etsy_products(subcategory, limit=100):
     products = []
-    data = ETSY_DATASETS.get(subcategory.lower())
     
+    # ✅ Original category save karein
     original_subcategory = subcategory
     
     # ✅ Underscore ko space mein convert karein (sirf Etsy ke liye)
-    subcategory = subcategory.replace("_", " ")
+    clean_subcategory = subcategory.replace("_", " ")
     
-    # ✅ Pehle space wali try karein
-    data = ETSY_DATASETS.get(subcategory.lower())
+    # ✅ Pehle space wali category try karein
+    data = ETSY_DATASETS.get(clean_subcategory.lower())
     
     # ✅ Agar nahi mili toh underscore wali try karein (fallback)
     if not data:
         fallback_category = original_subcategory.replace(" ", "_")
         data = ETSY_DATASETS.get(fallback_category)
         if data:
-            print(f"✅ Found {fallback_category} as fallback for {subcategory}")
+            print(f"✅ Found '{fallback_category}' as fallback for '{clean_subcategory}'")
     
+    # ✅ Agar phir bhi nahi mili toh error
     if not data:
-        raise Exception(f"No data found for subcategory: {subcategory}")
-
+        raise Exception(f"No data found for subcategory: {original_subcategory} or {clean_subcategory}")
+    
     # ✅ Debug: Pehle item ki keys dekhein
     if data:
         print(f"🔍 First Etsy item keys: {list(data[0].keys())}")
+        print(f"📦 Total products in dataset: {len(data)}")
 
+    # ✅ Extract products
     for item in data:
         if len(products) >= limit:
             break
@@ -1453,20 +1456,24 @@ def extract_etsy_products(subcategory, limit=100):
                     price = float(str(price_str).replace('$', '').replace(',', '').strip())
                 except:
                     pass
-            
-            # 4. Try Price (capital P)
-            if price == 0:
-                price_str = item.get('Price', '0')
-                try:
-                    price = float(str(price_str).replace('$', '').replace(',', '').strip())
-                except:
-                    pass
 
             # ✅ Rating - try multiple sources
-            rating = float(item.get('rating') or item.get('ratingScore') or 0)
+            rating = 0.0
+            if item.get('rating'):
+                rating = float(item.get('rating', 0))
+            elif item.get('ratingScore'):
+                rating = float(item.get('ratingScore', 0))
+            else:
+                rating = 0.0
 
             # ✅ Reviews - try multiple sources
-            reviews = int(item.get('reviewCount') or item.get('itemSold') or 0)
+            reviews = 0
+            if item.get('reviewCount'):
+                reviews = int(item.get('reviewCount', 0))
+            elif item.get('itemSold'):
+                reviews = int(item.get('itemSold', 0))
+            else:
+                reviews = 0
 
             # ✅ Brand
             brand_obj = item.get('brand', {})
