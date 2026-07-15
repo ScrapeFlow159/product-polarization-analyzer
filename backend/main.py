@@ -1503,7 +1503,8 @@ def extract_etsy_products(subcategory, limit=100):
                 'price': price,
                 'rating': rating,
                 'reviews': reviews,
-                'popularity': 0.0,
+                'popularity': item.get('popularity', 0.0),      # ← GENERATED VALUE!
+                'popularity_score': item.get('popularity', 0.0), 
                 'seller': seller[:60],
                 'brand': brand[:40],
                 'url': url[:300]
