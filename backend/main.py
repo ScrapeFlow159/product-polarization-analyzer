@@ -1237,6 +1237,8 @@ async def save_apify_csv(products: list, category: str, platform: str):
         
         csv_path = os.path.join(data_dir, f"{category}.csv")
         df.to_csv(csv_path, index=False)
+        if 'popularity' not in df.columns:
+            df['popularity'] = 0.0
         
         print(f"✅ CSV saved: {csv_path} ({len(df)} products)")
         

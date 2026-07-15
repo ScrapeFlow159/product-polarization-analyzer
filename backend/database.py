@@ -266,6 +266,9 @@ def save_etsy_raw_products(category, products):
             brand = 'Etsy'
             product_url = str(p.get('url', p.get('itemUrl', '')))[:200]
             
+            # ✅ ✅ ✅ YEH LINE ADD KAREIN ✅ ✅ ✅
+            popularity = float(p.get('popularity', 0.0))
+            
             cursor.execute('''
                 INSERT INTO etsy_raw_products 
                 (category, product_name, price, rating, reviews, popularity, 
@@ -277,7 +280,7 @@ def save_etsy_raw_products(category, products):
                 price,
                 rating,
                 reviews,
-                0.0,  # popularity (calculate later)
+                popularity,  # ← AB DEFINED HAI!
                 seller,
                 brand,
                 product_url,
@@ -293,7 +296,6 @@ def save_etsy_raw_products(category, products):
         print(f"❌ Error saving Etsy products: {e}")
         traceback.print_exc()
         return False
-
 
 def get_daraz_raw_products(category=None, limit=100):
     """Get Daraz raw products"""
