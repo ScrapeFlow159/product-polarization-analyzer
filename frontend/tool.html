@@ -2786,7 +2786,7 @@ function displayResults(page) {
                             <td><strong>${price}</strong></td>
                             <td>${p.rating.toFixed(1)} ⭐</td>
                             <td>${p.reviews.toLocaleString()}</td>
-                            <td>${(p.popularity * 100).toFixed(0)}%</td>  // ✅ YEH SAHI HAI!
+                            <td>${(p.popularity_score * 100).toFixed(0)}%</td>
                             <td><span class="score-highlight">${finalScore}</span></td>
                             <td><span class="cluster-badge ${badgeClass}">${p.cluster_label}</span></td>
                         </tr>`;
