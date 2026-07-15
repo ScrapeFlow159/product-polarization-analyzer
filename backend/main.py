@@ -437,7 +437,6 @@ async def analyze_polarization(
         print(f"📊 System Default K-Value: {system_default_k}")
         
         # ========== GET CUSTOM PARAMETERS ==========
-        # Priority 1: Frontend values (user ne manually select kiya)
         custom_k = request.k_value if request.k_value is not None else system_default_k
         weights = request.weights if request.weights is not None else {
             "price": 1.0, "rating": 1.0, "reviews": 1.0, "popularity": 1.0
@@ -452,7 +451,6 @@ async def analyze_polarization(
             if db_params:
                 print(f"📊 Found saved params in DB: K={db_params.get('k_value')}")
                 
-                # Use saved params ONLY if frontend sent default
                 if custom_k == system_default_k:
                     custom_k = db_params.get("k_value", system_default_k)
                     print(f"🔄 Using saved K from DB: {custom_k}")
@@ -469,8 +467,9 @@ async def analyze_polarization(
         
         print(f"✅ FINAL PARAMETERS USED → k={custom_k}, weights={weights}")
         
-        
         # ========== PLATFORM SELECTION & DATA EXTRACTION ==========
+        
+        # -------- DARAZ --------
         if request.platform.lower() == "daraz":
             subcategory = request.subcategory.lower().replace(" ", "_")
             if subcategory not in DARAZ_DATASETS:
@@ -478,13 +477,35 @@ async def analyze_polarization(
             products = extract_daraz_products(subcategory, request.max_products)
             platform_name = "Daraz.pk"
             csv_file = f"{subcategory}.csv"
+        
+        # -------- ETSY (FIXED) --------
         elif request.platform.lower() == "etsy":
-            subcategory = request.subcategory.lower().replace(" ", "_")
-            if subcategory not in ETSY_DATASETS:
-                raise HTTPException(status_code=404, detail=f"No CSV found for Etsy subcategory: {request.subcategory}")
+            # ✅ Dono formats try karein (space aur underscore)
+            subcategory_space = request.subcategory.lower()
+            subcategory_underscore = request.subcategory.lower().replace(" ", "_")
+            
+            print(f"🔍 Searching for Etsy category: '{subcategory_space}' or '{subcategory_underscore}'")
+            print(f"📂 Available Etsy categories: {list(ETSY_DATASETS.keys())}")
+            
+            # ✅ Check if either format exists
+            if subcategory_space in ETSY_DATASETS:
+                subcategory = subcategory_space
+                print(f"✅ Found Etsy category (space): '{subcategory}'")
+            elif subcategory_underscore in ETSY_DATASETS:
+                subcategory = subcategory_underscore
+                print(f"✅ Found Etsy category (underscore): '{subcategory}'")
+            else:
+                # ❌ Error with details
+                print(f"❌ Category not found: '{subcategory_space}' or '{subcategory_underscore}'")
+                raise HTTPException(
+                    status_code=404, 
+                    detail=f"No CSV found for Etsy subcategory: {request.subcategory}"
+                )
+            
             products = extract_etsy_products(subcategory, request.max_products)
             platform_name = "Etsy.com"
             csv_file = f"{subcategory}.csv"
+        
         else:
             raise HTTPException(status_code=400, detail="Invalid platform")
         
@@ -521,7 +542,7 @@ async def analyze_polarization(
             if snapshots and len(snapshots) >= days:
                 last_n_scores = [s['polarization_score'] for s in snapshots[-days:]]
                 avg_score = sum(last_n_scores) / len(last_n_scores)
-                print(f"📊 {request.analysis_type.upper()} - Using historical average: {avg_score:.4f} (current would be: {polarization_score:.4f})")
+                print(f"📊 {request.analysis_type.upper()} - Using historical average: {avg_score:.4f}")
                 polarization_score = avg_score
             else:
                 print(f"⚠️ Not enough historical data for {request.analysis_type} (need {days}, have {len(snapshots) if snapshots else 0})")
@@ -566,11 +587,13 @@ async def analyze_polarization(
                 seller=p.get('seller'),
                 brand=p.get('brand')
             ))
+        
         results = [{
             "date": datetime.now().strftime('%Y-%m-%d'),
             "polarization_score": polarization_score
         }]
         insights = generate_insights(results)
+        
         result = PolarizationAnalysis(
             platform=platform_name,
             total_products=len(products),
@@ -637,9 +660,6 @@ async def analyze_polarization(
         print(f"❌ Error: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/api/public-system-settings")
 async def get_public_settings():
     """
     Public endpoint for getting system settings - NO AUTH REQUIRED
