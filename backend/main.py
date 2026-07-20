@@ -1554,44 +1554,127 @@ def calculate_ranking_score(product):
              (1 - product['price_norm']) * 0.15)
     return score
 
+
 def apply_clustering(products, n_clusters=3, weights=None):
+    """
+    Improved clustering with safe optimizations
+    - Standard scaling for better distance calculation
+    - Log transformation for reviews (reduces noise)
+    - Dynamic K selection (optional, with fallback)
+    - n_init increased for better convergence
+    """
+    import numpy as np
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.metrics import silhouette_score
+    from sklearn.cluster import KMeans
+    
+    # ✅ MINIMUM PRODUCTS CHECK
     if len(products) < n_clusters:
         n_clusters = max(2, len(products))
     
-    features = [[p['price_norm'], p['rating_norm'], p['review_norm'], p['popularity_norm']] for p in products]
+    # ✅ Step 1: Extract features
+    features = []
+    for p in products:
+        # ✅ Safe: reviews ko log scale mein convert karein (noise reduce)
+        review_log = np.log1p(p.get('reviews', 0))
+        
+        features.append([
+            p.get('price_norm', 0.0),
+            p.get('rating_norm', 0.0),
+            review_log,  # ← log transformed reviews
+            p.get('popularity_norm', 0.0)
+        ])
+    
     X = np.array(features)
     
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-    clusters = kmeans.fit_predict(X)
+    # ✅ Step 2: Standard Scaling (MOST IMPORTANT)
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
     
+    # ✅ Step 3: Find best K (optional, with fallback)
+    use_dynamic_k = len(products) >= 10  # Only if enough data
+    
+    if use_dynamic_k:
+        best_k = n_clusters
+        best_score = -1
+        max_k = min(6, len(products))
+        
+        for k in range(2, max_k + 1):
+            kmeans_tmp = KMeans(n_clusters=k, random_state=42, n_init=15)
+            labels_tmp = kmeans_tmp.fit_predict(X_scaled)
+            
+            if len(set(labels_tmp)) > 1:  # At least 2 clusters
+                try:
+                    score = silhouette_score(X_scaled, labels_tmp)
+                    if score > best_score:
+                        best_score = score
+                        best_k = k
+                except:
+                    pass
+        
+        final_k = best_k
+    else:
+        final_k = n_clusters
+    
+    # ✅ Step 4: K-Means with higher n_init
+    kmeans = KMeans(
+        n_clusters=final_k,
+        random_state=42,
+        n_init=20  # ← Increased for better quality
+    )
+    
+    clusters = kmeans.fit_predict(X_scaled)
     centers = kmeans.cluster_centers_
-    center_prices = [center[0] for center in centers]
-    sorted_indices = np.argsort(center_prices)
     
+    # ✅ Step 5: Map clusters to labels
+    center_prices = [center[0] for center in centers]  # price dimension (after scaling)
+    sorted_indices = np.argsort(center_prices)
     cluster_map = {old: new for new, old in enumerate(sorted_indices)}
     mapped_clusters = [cluster_map[c] for c in clusters]
     
+    # ✅ Step 6: Labels
     labels = []
-    for i in range(n_clusters):
-        if i == 0:
-            labels.append("Budget")
-        elif i == n_clusters - 1:
-            labels.append("Premium")
+    for i in range(final_k):
+        if final_k == 2:
+            if i == 0:
+                labels.append("Budget")
+            else:
+                labels.append("Premium")
+        elif final_k == 3:
+            if i == 0:
+                labels.append("Budget")
+            elif i == final_k - 1:
+                labels.append("Premium")
+            else:
+                labels.append("Mid-Range")
         else:
-            labels.append("Mid-Range")
+            # For K > 3
+            if i == 0:
+                labels.append("Budget")
+            elif i == final_k - 1:
+                labels.append("Premium")
+            else:
+                labels.append(f"Cluster_{i+1}")
     
+    # ✅ Step 7: Assign to products
     for i, p in enumerate(products):
         p['cluster'] = int(mapped_clusters[i])
         p['cluster_label'] = labels[mapped_clusters[i]]
         p['ranking_score'] = calculate_ranking_score(p)
-
+    
+    # ✅ Step 8: Silhouette Score
     sil_score = 0.0
-    if n_clusters >= 2 and len(products) >= n_clusters:
+    if final_k >= 2 and len(products) >= final_k:
         try:
-            sil_score = silhouette_score(X, mapped_clusters)
+            sil_score = silhouette_score(X_scaled, mapped_clusters)
         except:
             sil_score = 0.0
-
+    
+    print(f"📊 Clustering completed:")
+    print(f"   Original K: {n_clusters}, Used K: {final_k}")
+    print(f"   Silhouette Score: {sil_score:.4f}")
+    print(f"   Products: {len(products)}")
+    
     return products, centers, labels, sil_score
 def calculate_polarization_score(products, centers, n_clusters):
     """Calculate polarization score based on cluster separation"""
